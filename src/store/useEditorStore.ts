@@ -2,6 +2,8 @@ import { create } from 'zustand';
 import type {
   AlphaPreviewMode,
   CanvasConfig,
+  CanvasMode,
+  CanvasSelection,
   ColorEditRule,
   CropRect,
   EditorSnapshot,
@@ -14,8 +16,16 @@ import type {
   MagicEraserMode,
   PanelLayoutConfig,
   ProjectFile,
+  SelectionOperation,
+  SelectionShape,
+  SelectionStep,
   ToolType,
 } from '../types/editor';
+import {
+  combineSelectionStep,
+  translateSelection,
+  type CopiedSelectionResult,
+} from '../utils/selectionUtils';
 import { createDefaultImageAdjustments } from '../utils/imageFilters';
 import {
   clamp,
@@ -65,6 +75,7 @@ export interface EditorState {
   canvas: CanvasConfig;
   layers: Layer[];
   selectedLayerId: string | null;
+  canvasMode: CanvasMode;
   activeTool: ToolType;
   zoom: number;
   alphaPreviewMode: AlphaPreviewMode;
@@ -75,6 +86,14 @@ export interface EditorState {
   magicEraserMode: MagicEraserMode;
   magicEraserTolerance: number;
   magicEraserRadius: number;
+  selectionShape: SelectionShape;
+  selectionOperation: SelectionOperation;
+  selection: CanvasSelection | null;
+  selectionClipboard: CopiedSelectionResult | null;
+  openPropertySections: Record<
+    'alpha' | 'transform' | 'bg-remove' | 'color-adjust',
+    boolean
+  >;
 
   past: EditorSnapshot[];
   future: EditorSnapshot[];
@@ -140,6 +159,7 @@ export interface EditorState {
   setSelectedLayer: (id: string | null) => void;
 
   // UI & tool actions
+  setCanvasMode: (mode: CanvasMode) => void;
   setActiveTool: (tool: ToolType) => void;
   setZoom: (zoom: number) => void;
   setAlphaPreviewMode: (mode: AlphaPreviewMode) => void;
@@ -161,6 +181,21 @@ export interface EditorState {
   setMagicEraserMode: (mode: MagicEraserMode) => void;
   setMagicEraserTolerance: (tolerance: number) => void;
   setMagicEraserRadius: (radius: number) => void;
+  setSelectionShape: (shape: SelectionShape) => void;
+  setSelectionOperation: (op: SelectionOperation) => void;
+  setSelection: (selection: CanvasSelection | null) => void;
+  applySelectionStep: (step: SelectionStep) => void;
+  moveSelection: (dx: number, dy: number) => void;
+  clearSelection: () => void;
+  setSelectionClipboard: (clip: CopiedSelectionResult | null) => void;
+  pasteClipboardAsLayer: () => void;
+  togglePropertySection: (
+    section: 'alpha' | 'transform' | 'bg-remove' | 'color-adjust'
+  ) => void;
+  setPropertySectionOpen: (
+    section: 'alpha' | 'transform' | 'bg-remove' | 'color-adjust',
+    open: boolean
+  ) => void;
 }
 
 const DEFAULT_CANVAS: CanvasConfig = {
@@ -216,6 +251,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   canvas: DEFAULT_CANVAS,
   layers: [],
   selectedLayerId: null,
+  canvasMode: 'edit',
   activeTool: 'select',
   zoom: 1,
   alphaPreviewMode: 'checker-dark',
@@ -226,6 +262,16 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   magicEraserMode: 'flood',
   magicEraserTolerance: 25,
   magicEraserRadius: 30,
+  selectionShape: 'rect',
+  selectionOperation: 'replace',
+  selection: null,
+  selectionClipboard: null,
+  openPropertySections: {
+    alpha: true,
+    transform: true,
+    'bg-remove': false,
+    'color-adjust': false,
+  },
   past: [],
   future: [],
 
@@ -787,11 +833,23 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
   setSelectedLayer: (id) => set({ selectedLayerId: id }),
 
+  setCanvasMode: (mode) =>
+    set((state) => ({
+      canvasMode: mode,
+      activeTool: mode === 'view' ? 'select' : state.activeTool,
+    })),
+
   setActiveTool: (tool) =>
     set((state) => ({
       activeTool: tool,
       eyedropperTarget: tool === 'eyedropper' ? state.eyedropperTarget : null,
       cropRect: tool === 'crop' ? state.cropRect : null,
+      openPropertySections:
+        tool === 'select' || tool === 'marquee'
+          ? { ...state.openPropertySections, transform: true }
+          : tool === 'magic-eraser'
+          ? { ...state.openPropertySections, 'bg-remove': true }
+          : state.openPropertySections,
     })),
 
   setZoom: (zoom) => set({ zoom: clamp(zoom, 0.1, 5) }),
@@ -821,16 +879,21 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }),
 
   startBgRemoveEyedropper: (layerId) =>
-    set({
+    set((state) => ({
       activeTool: 'eyedropper',
       eyedropperTarget: { kind: 'bg-remove', layerId },
-    }),
+      openPropertySections: { ...state.openPropertySections, 'bg-remove': true },
+    })),
 
   startColorEditEyedropper: (layerId, ruleId, field) =>
-    set({
+    set((state) => ({
       activeTool: 'eyedropper',
       eyedropperTarget: { kind: 'color-edit', layerId, ruleId, field },
-    }),
+      openPropertySections: {
+        ...state.openPropertySections,
+        'color-adjust': true,
+      },
+    })),
 
   pickEyedropperColor: (hex) => {
     const { eyedropperTarget } = get();
@@ -891,4 +954,75 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
   setMagicEraserRadius: (radius) =>
     set({ magicEraserRadius: clamp(radius, 5, 200) }),
+
+  setSelectionShape: (shape) => set({ selectionShape: shape }),
+
+  setSelectionOperation: (op) => set({ selectionOperation: op }),
+
+  setSelection: (selection) => set({ selection }),
+
+  applySelectionStep: (step) =>
+    set((state) => ({
+      selection: combineSelectionStep(state.selection, step),
+    })),
+
+  moveSelection: (dx, dy) =>
+    set((state) => ({
+      selection: state.selection
+        ? translateSelection(state.selection, dx, dy)
+        : null,
+    })),
+
+  clearSelection: () => set({ selection: null }),
+
+  setSelectionClipboard: (clip) => set({ selectionClipboard: clip }),
+
+  pasteClipboardAsLayer: () => {
+    const { selectionClipboard, layers } = get();
+    if (!selectionClipboard) return;
+    get().pushHistory();
+    const newLayer: ImageLayer = {
+      id: generateId('img'),
+      name: selectionClipboard.name || `Selection ${layers.length + 1}`,
+      type: 'image',
+      src: selectionClipboard.src,
+      naturalWidth: selectionClipboard.width,
+      naturalHeight: selectionClipboard.height,
+      cropX: 0,
+      cropY: 0,
+      cropWidth: selectionClipboard.width,
+      cropHeight: selectionClipboard.height,
+      x: selectionClipboard.x + 12,
+      y: selectionClipboard.y + 12,
+      width: selectionClipboard.width,
+      height: selectionClipboard.height,
+      rotation: 0,
+      opacity: 1,
+      visible: true,
+      locked: false,
+      lockAspectRatio: true,
+      adjustments: createDefaultImageAdjustments(),
+    };
+    set({
+      layers: [...layers, newLayer],
+      selectedLayerId: newLayer.id,
+      activeTool: 'select',
+    });
+  },
+
+  togglePropertySection: (section) =>
+    set((state) => ({
+      openPropertySections: {
+        ...state.openPropertySections,
+        [section]: !state.openPropertySections[section],
+      },
+    })),
+
+  setPropertySectionOpen: (section, open) =>
+    set((state) => ({
+      openPropertySections: {
+        ...state.openPropertySections,
+        [section]: open,
+      },
+    })),
 }));

@@ -44,7 +44,8 @@ export function hasActiveAdjustments(adj?: ImageAdjustments): boolean {
  */
 export function processImageData(
   data: Uint8ClampedArray,
-  adjustments: ImageAdjustments
+  adjustments: ImageAdjustments,
+  selectionMask?: Uint8Array
 ): void {
   const {
     brightness,
@@ -90,6 +91,8 @@ export function processImageData(
   const vibAmt = clamp(vibrance, -100, 100) / 100;
 
   for (let i = 0; i < data.length; i += 4) {
+    // Skip pixels outside active selection if a selectionMask is provided
+    if (selectionMask && selectionMask[i >> 2] === 0) continue;
     // Skip fully transparent pixels
     if (data[i + 3] === 0) continue;
 
@@ -204,7 +207,8 @@ export function processImageData(
 export function applyImageAdjustmentsToCanvas(
   img: HTMLImageElement,
   adjustments?: ImageAdjustments,
-  maxDim?: number
+  maxDim?: number,
+  selectionMask?: Uint8Array
 ): HTMLCanvasElement {
   const natW = img.naturalWidth || img.width || 1;
   const natH = img.naturalHeight || img.height || 1;
@@ -227,7 +231,7 @@ export function applyImageAdjustmentsToCanvas(
 
   if (adjustments && hasActiveAdjustments(adjustments)) {
     const imageData = ctx.getImageData(0, 0, w, h);
-    processImageData(imageData.data, adjustments);
+    processImageData(imageData.data, adjustments, selectionMask);
     ctx.putImageData(imageData, 0, 0);
   }
 

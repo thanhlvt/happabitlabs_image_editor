@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import {
   AlignCenter,
   AlignHorizontalJustifyEnd,
@@ -12,6 +12,8 @@ import {
   Maximize,
   MoveHorizontal,
   MoveVertical,
+  RotateCcw,
+  RotateCw,
   Scaling,
   Unlock,
 } from 'lucide-react';
@@ -19,12 +21,73 @@ import { useEditorStore } from '../../store/useEditorStore';
 import { computeAspectDimensions, computeLayerFit } from '../../utils/geometry';
 import { FogControls } from './FogControls';
 import { ImageAdjustmentsPanel } from './ImageAdjustmentsPanel';
+import { CollapsibleSection } from './CollapsibleSection';
 
 interface PropertiesPanelProps {
   onOpenResizeModal: () => void;
 }
 
 const ALPHA_PRESETS = [0.25, 0.5, 0.75, 1];
+
+interface RotationDialProps {
+  angle: number;
+  onStartDrag: () => void;
+  onChange: (nextAngle: number) => void;
+}
+
+const RotationDial: React.FC<RotationDialProps> = ({
+  angle,
+  onStartDrag,
+  onChange,
+}) => {
+  const dialRef = useRef<HTMLDivElement | null>(null);
+
+  const updateFromPointer = (clientX: number, clientY: number) => {
+    const el = dialRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
+    const rad = Math.atan2(clientY - cy, clientX - cx);
+    const deg = Math.round(((rad * 180) / Math.PI + 90 + 360) % 360);
+    onChange(deg);
+  };
+
+  return (
+    <div
+      ref={dialRef}
+      role="slider"
+      aria-label="Nút xoay bằng chuột"
+      aria-valuemin={0}
+      aria-valuemax={360}
+      aria-valuenow={Math.round(((angle % 360) + 360) % 360)}
+      title="Nhấn giữ và rê chuột để xoay góc"
+      onPointerDown={(e) => {
+        e.preventDefault();
+        onStartDrag();
+        updateFromPointer(e.clientX, e.clientY);
+
+        const handleMove = (ev: PointerEvent) => {
+          updateFromPointer(ev.clientX, ev.clientY);
+        };
+        const handleUp = () => {
+          window.removeEventListener('pointermove', handleMove);
+          window.removeEventListener('pointerup', handleUp);
+        };
+        window.addEventListener('pointermove', handleMove);
+        window.addEventListener('pointerup', handleUp);
+      }}
+      className="relative w-7 h-7 rounded-full bg-[#0f1115] border border-slate-700 hover:border-blue-400 cursor-grab active:cursor-grabbing shrink-0 flex items-center justify-center"
+    >
+      <div
+        className="w-full h-full flex items-start justify-center p-0.5"
+        style={{ transform: `rotate(${angle}deg)` }}
+      >
+        <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 shadow" />
+      </div>
+    </div>
+  );
+};
 
 export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
   onOpenResizeModal,
@@ -33,6 +96,8 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
     canvas,
     layers,
     selectedLayerId,
+    openPropertySections,
+    togglePropertySection,
     updateLayer,
     setCanvasBackground,
     enterCropMode,
@@ -136,14 +201,17 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
         </span>
       </div>
 
-      {/* Overall Object Alpha / Opacity */}
-      <div className="bg-[#0f1115] border border-slate-800 rounded-lg p-2.5 space-y-2">
-        <div className="flex items-center justify-between">
-          <span className="text-slate-300 font-medium">Kênh Alpha (Opacity)</span>
-          <span className="font-mono text-cyan-300">
+      {/* 1. Overall Object Alpha / Opacity */}
+      <CollapsibleSection
+        title="Kênh Alpha (Opacity)"
+        open={openPropertySections.alpha}
+        onToggle={() => togglePropertySection('alpha')}
+        rightBadge={
+          <span className="font-mono text-[11px] text-cyan-300">
             {Math.round(layer.opacity * 100)}%
           </span>
-        </div>
+        }
+      >
         <input
           type="range"
           aria-label="Kênh Alpha (Opacity)"
@@ -173,12 +241,14 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
             </button>
           ))}
         </div>
-      </div>
+      </CollapsibleSection>
 
-      {/* Transform */}
-      <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <span className="text-[11px] font-medium text-slate-400">Vị trí & Kích thước</span>
+      {/* 2. Transform */}
+      <CollapsibleSection
+        title="Vị trí & Kích thước"
+        open={openPropertySections.transform}
+        onToggle={() => togglePropertySection('transform')}
+        rightBadge={
           <button
             type="button"
             onClick={() =>
@@ -198,7 +268,8 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
             )}
             Tỉ lệ
           </button>
-        </div>
+        }
+      >
 
         <div className="grid grid-cols-2 gap-2">
           <label className="flex items-center bg-[#0f1115] border border-slate-800 rounded px-2 py-1">
@@ -249,19 +320,54 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
           </label>
         </div>
 
-        <div className="flex items-center gap-2">
-          <label className="flex items-center flex-1 bg-[#0f1115] border border-slate-800 rounded px-2 py-1">
-            <span className="text-slate-500 mr-2">Xoay</span>
+        <div className="flex items-center gap-1.5">
+          <RotationDial
+            angle={layer.rotation}
+            onStartDrag={pushHistory}
+            onChange={(deg) => updateLayer(layer.id, { rotation: deg }, false)}
+          />
+          <label className="flex items-center flex-1 bg-[#0f1115] border border-slate-800 rounded px-2 py-1 min-w-0">
+            <span className="text-slate-500 mr-1.5">Xoay</span>
             <input
               type="number"
               value={layer.rotation}
               onChange={(e) =>
                 updateLayer(layer.id, { rotation: Number(e.target.value) || 0 }, true)
               }
-              className="w-full bg-transparent text-slate-100 focus:outline-none font-mono"
+              className="w-full bg-transparent text-slate-100 focus:outline-none font-mono min-w-0"
             />
             <span className="text-slate-500">°</span>
           </label>
+          <button
+            type="button"
+            aria-label="Xoay trái 90 độ"
+            title="Xoay trái 90°"
+            onClick={() =>
+              updateLayer(
+                layer.id,
+                { rotation: Math.round((layer.rotation - 90) * 10) / 10 },
+                true
+              )
+            }
+            className="p-1.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300"
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+          </button>
+          <button
+            type="button"
+            aria-label="Xoay phải 90 độ"
+            title="Xoay phải 90°"
+            onClick={() =>
+              updateLayer(
+                layer.id,
+                { rotation: Math.round((layer.rotation + 90) * 10) / 10 },
+                true
+              )
+            }
+            className="p-1.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300"
+          >
+            <RotateCw className="w-3.5 h-3.5" />
+          </button>
           <button
             type="button"
             aria-label="Flip horizontal"
@@ -395,7 +501,7 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
             <MoveVertical className="w-3.5 h-3.5" />
           </button>
         </div>
-      </div>
+      </CollapsibleSection>
 
       {/* Fog-specific or Image-specific controls */}
       {layer.type === 'fog' ? (

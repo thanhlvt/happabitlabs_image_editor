@@ -9,6 +9,7 @@ import {
   GripVertical,
   ImagePlus,
   Lock,
+  Pencil,
   Trash2,
   Unlock,
 } from 'lucide-react';
@@ -255,9 +256,22 @@ export const LayerPanel: React.FC = () => {
                   </button>
                   <button
                     type="button"
+                    aria-label={`Đổi tên ${layer.name}`}
+                    onClick={() => {
+                      setEditingId(layer.id);
+                      setDraftName(layer.name);
+                    }}
+                    title="Đổi tên layer"
+                    className="p-1 rounded hover:bg-slate-700 text-slate-400 hover:text-slate-100"
+                  >
+                    <Pencil className="w-3 h-3" />
+                  </button>
+                  <button
+                    type="button"
+                    aria-label={`Nhân bản ${layer.name}`}
                     onClick={() => duplicateLayer(layer.id)}
                     title="Nhân bản (Ctrl+D)"
-                    className="p-1 rounded hover:bg-slate-700 text-slate-400 hover:text-slate-100 hidden group-hover:inline-flex"
+                    className="p-1 rounded hover:bg-slate-700 text-slate-400 hover:text-slate-100 inline-flex"
                   >
                     <Copy className="w-3 h-3" />
                   </button>

@@ -1,5 +1,10 @@
 import UPNG from 'upng-js';
-import type { CanvasConfig, ExportFormat, Layer } from '../types/editor';
+import type {
+  CanvasConfig,
+  CanvasSelection,
+  ExportFormat,
+  Layer,
+} from '../types/editor';
 import { loadImageElement } from './fileHelpers';
 import { renderFogToCanvas } from './fogRenderer';
 import { clamp } from './geometry';
@@ -7,6 +12,7 @@ import {
   applyImageAdjustmentsToCanvas,
   hasActiveAdjustments,
 } from './imageFilters';
+import { createLayerMaskFromSelection } from './selectionUtils';
 
 export interface RenderCompositeOptions {
   scale?: number;
@@ -14,6 +20,8 @@ export interface RenderCompositeOptions {
   stopBeforeIndex?: number;
   /** Preloaded HTMLImageElements keyed by ImageLayer.src */
   imageCache?: Map<string, HTMLImageElement>;
+  selection?: CanvasSelection | null;
+  selectedLayerId?: string | null;
 }
 
 /**
@@ -60,11 +68,26 @@ export async function renderCompositeCanvas(
         imageCache.set(layer.src, img);
       }
 
-      const sourceDrawable: CanvasImageSource = hasActiveAdjustments(
-        layer.adjustments
-      )
-        ? applyImageAdjustmentsToCanvas(img, layer.adjustments)
-        : img;
+      let sourceDrawable: CanvasImageSource = img;
+      if (hasActiveAdjustments(layer.adjustments)) {
+        const useSelMask =
+          options.selection &&
+          (!options.selectedLayerId || options.selectedLayerId === layer.id);
+        const mask = useSelMask
+          ? createLayerMaskFromSelection(
+              layer,
+              options.selection!,
+              img.naturalWidth || img.width || layer.naturalWidth,
+              img.naturalHeight || img.height || layer.naturalHeight
+            )
+          : undefined;
+        sourceDrawable = applyImageAdjustmentsToCanvas(
+          img,
+          layer.adjustments,
+          undefined,
+          mask
+        );
+      }
 
       const cx = (layer.x + layer.width / 2) * scale;
       const cy = (layer.y + layer.height / 2) * scale;

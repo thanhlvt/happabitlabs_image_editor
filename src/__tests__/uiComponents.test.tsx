@@ -20,6 +20,12 @@ describe('Editor UI Components', () => {
       cropRect: null,
       cropAspect: null,
       eyedropperTarget: null,
+      openPropertySections: {
+        alpha: true,
+        transform: true,
+        'bg-remove': false,
+        'color-adjust': false,
+      },
       past: [],
       future: [],
     });
@@ -131,6 +137,7 @@ describe('Editor UI Components', () => {
         height: 100,
       },
     ]);
+    useEditorStore.getState().setPropertySectionOpen('color-adjust', true);
 
     render(<PropertiesPanel onOpenResizeModal={() => {}} />);
 
@@ -149,7 +156,7 @@ describe('Editor UI Components', () => {
       expect(afterRule.adjustments?.colorEdits).toHaveLength(1);
     }
 
-    fireEvent.click(screen.getByText('Reset'));
+    fireEvent.click(screen.getByLabelText('Reset chỉnh màu'));
     const afterReset = useEditorStore.getState().layers[0];
     if (afterReset.type === 'image') {
       expect(afterReset.adjustments?.brightness).toBe(0);
@@ -284,10 +291,11 @@ describe('Editor UI Components', () => {
         height: 100,
       },
     ]);
+    useEditorStore.getState().setPropertySectionOpen('bg-remove', true);
 
     render(<PropertiesPanel onOpenResizeModal={() => {}} />);
 
-    fireEvent.click(screen.getByText('Xóa nền'));
+    fireEvent.click(screen.getByLabelText('Bật hoặc tắt xóa nền'));
     const layer = useEditorStore.getState().layers[0];
     expect(layer.type).toBe('image');
     if (layer.type === 'image') {
@@ -297,7 +305,7 @@ describe('Editor UI Components', () => {
       });
     }
 
-    fireEvent.click(screen.getByText('Hút màu xóa'));
+    fireEvent.click(screen.getByLabelText('Hút màu xóa'));
     expect(useEditorStore.getState().activeTool).toBe('eyedropper');
     useEditorStore.getState().pickEyedropperColor('#00ff00');
 
@@ -308,7 +316,7 @@ describe('Editor UI Components', () => {
     }
   });
 
-  it('Magic Eraser toggles tool and switches between flood and circle modes', () => {
+  it('Magic Eraser toggles tool and auto-opens Remove Background section; LayerPanel has fixed Copy and Rename', () => {
     useEditorStore.getState().newCanvas(800, 600, null);
     useEditorStore.getState().insertImages([
       {
@@ -318,10 +326,31 @@ describe('Editor UI Components', () => {
         height: 100,
       },
     ]);
+    useEditorStore.getState().setPropertySectionOpen('bg-remove', false);
 
-    render(<PropertiesPanel onOpenResizeModal={() => {}} />);
-    fireEvent.click(screen.getByText('Mở Magic Background Eraser'));
+    render(
+      <div>
+        <PropertiesPanel onOpenResizeModal={() => {}} />
+        <LayerPanel />
+      </div>
+    );
+
+    // Click Magic Eraser button -> activates tool & auto-opens Remove Background section
+    fireEvent.click(screen.getByLabelText('Mở Magic Background Eraser'));
     expect(useEditorStore.getState().activeTool).toBe('magic-eraser');
+    expect(useEditorStore.getState().openPropertySections['bg-remove']).toBe(true);
+
+    // Toggle collapsible section by clicking its title
+    fireEvent.click(screen.getByText('Chỉnh màu & Ánh sáng'));
+    expect(useEditorStore.getState().openPropertySections['color-adjust']).toBe(true);
+
+    // LayerPanel has always-visible Copy & Rename buttons
+    expect(screen.getByLabelText('Nhân bản Photo')).toBeInTheDocument();
+    fireEvent.click(screen.getByLabelText('Đổi tên Photo'));
+    const renameInput = screen.getByDisplayValue('Photo');
+    fireEvent.change(renameInput, { target: { value: 'Hero Renamed' } });
+    fireEvent.keyDown(renameInput, { key: 'Enter' });
+    expect(useEditorStore.getState().layers[0].name).toBe('Hero Renamed');
 
     useEditorStore.getState().setMagicEraserMode('circle');
     useEditorStore.getState().setMagicEraserRadius(45);
@@ -330,5 +359,68 @@ describe('Editor UI Components', () => {
     expect(useEditorStore.getState().magicEraserMode).toBe('circle');
     expect(useEditorStore.getState().magicEraserRadius).toBe(45);
     expect(useEditorStore.getState().magicEraserTolerance).toBe(35);
+  });
+
+  it('supports View/Edit canvasMode, selection clear/paste, and mouse rotation dial + quick rotate', () => {
+    useEditorStore.getState().setCanvasMode('view');
+    expect(useEditorStore.getState().canvasMode).toBe('view');
+
+    useEditorStore.getState().setCanvasMode('edit');
+    useEditorStore.getState().setSelection({
+      shape: 'ellipse',
+      x: 10,
+      y: 10,
+      width: 100,
+      height: 60,
+    });
+    expect(useEditorStore.getState().selection?.shape).toBe('ellipse');
+
+    useEditorStore.getState().setSelectionOperation('union');
+    useEditorStore.getState().applySelectionStep({
+      op: 'union',
+      shape: 'rect',
+      x: 120,
+      y: 10,
+      width: 40,
+      height: 40,
+    });
+    expect(useEditorStore.getState().selection?.steps).toHaveLength(2);
+    expect(useEditorStore.getState().selection?.width).toBe(150);
+
+    useEditorStore.getState().clearSelection();
+    expect(useEditorStore.getState().selection).toBeNull();
+
+    useEditorStore.getState().setSelectionClipboard({
+      src: 'data:image/png;base64,clip',
+      x: 20,
+      y: 30,
+      width: 80,
+      height: 40,
+      name: 'Cutout',
+    });
+    useEditorStore.getState().pasteClipboardAsLayer();
+    expect(useEditorStore.getState().layers).toHaveLength(1);
+    expect(useEditorStore.getState().layers[0].x).toBe(32);
+
+    // Move selection frame only (layer x stays at 32)
+    useEditorStore.getState().setSelection({
+      shape: 'rect',
+      x: 10,
+      y: 10,
+      width: 50,
+      height: 50,
+    });
+    useEditorStore.getState().moveSelection(40, 25);
+    expect(useEditorStore.getState().selection).toMatchObject({ x: 50, y: 35 });
+    expect(useEditorStore.getState().layers[0].x).toBe(32);
+
+    render(<PropertiesPanel onOpenResizeModal={() => {}} />);
+    expect(screen.getByLabelText('Nút xoay bằng chuột')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByLabelText('Xoay phải 90 độ'));
+    expect(useEditorStore.getState().layers[0].rotation).toBe(90);
+
+    fireEvent.click(screen.getByLabelText('Xoay trái 90 độ'));
+    expect(useEditorStore.getState().layers[0].rotation).toBe(0);
   });
 });

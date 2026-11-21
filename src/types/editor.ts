@@ -119,9 +119,45 @@ export interface FogLayer extends BaseLayer {
 
 export type Layer = ImageLayer | FogLayer;
 
-export type ToolType = 'select' | 'crop' | 'eyedropper' | 'magic-eraser';
+export type CanvasMode = 'edit' | 'view';
+
+export type ToolType =
+  | 'select'
+  | 'crop'
+  | 'eyedropper'
+  | 'magic-eraser'
+  | 'marquee';
 
 export type MagicEraserMode = 'flood' | 'circle';
+
+export type SelectionShape = 'rect' | 'square' | 'circle' | 'ellipse' | 'lasso';
+
+export type SelectionOperation = 'replace' | 'union' | 'subtract' | 'intersect';
+
+export interface SelectionPoint {
+  x: number;
+  y: number;
+}
+
+export interface SelectionStep {
+  op: SelectionOperation;
+  shape: SelectionShape;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  points?: SelectionPoint[];
+}
+
+export interface CanvasSelection {
+  shape: SelectionShape;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  points?: SelectionPoint[];
+  steps?: SelectionStep[];
+}
 
 export type AlphaPreviewMode = 'checker-dark' | 'checker-light' | 'solid-black';
 

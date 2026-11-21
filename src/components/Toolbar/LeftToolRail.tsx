@@ -1,11 +1,26 @@
 import React, { useRef } from 'react';
-import { CloudFog, Crop, ImagePlus, MousePointer2, Wand2 } from 'lucide-react';
+import {
+  BoxSelect,
+  CloudFog,
+  Crop,
+  Hand,
+  ImagePlus,
+  MousePointer2,
+  Wand2,
+} from 'lucide-react';
 import { useEditorStore } from '../../store/useEditorStore';
 import { readLocalImageFile } from '../../utils/fileHelpers';
 
 export const LeftToolRail: React.FC = () => {
-  const { activeTool, setActiveTool, enterCropMode, insertImages, addFogLayer } =
-    useEditorStore();
+  const {
+    canvasMode,
+    activeTool,
+    setCanvasMode,
+    setActiveTool,
+    enterCropMode,
+    insertImages,
+    addFogLayer,
+  } = useEditorStore();
   const insertInputRef = useRef<HTMLInputElement | null>(null);
 
   const handleInsertFiles = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -18,11 +33,29 @@ export const LeftToolRail: React.FC = () => {
 
   return (
     <aside className="w-[52px] bg-[#161920] border-r border-slate-800 flex flex-col items-center py-3 gap-2 shrink-0">
+      {/* View / Pan Mode */}
       <button
-        onClick={() => setActiveTool('select')}
-        title="Chọn & Di chuyển (V)"
+        onClick={() => setCanvasMode(canvasMode === 'view' ? 'edit' : 'view')}
+        title="Chế độ View — Kéo để di chuyển vùng nhìn, Scroll để Zoom (H)"
+        aria-pressed={canvasMode === 'view'}
         className={`w-9 h-9 rounded-lg flex items-center justify-center transition ${
-          activeTool === 'select'
+          canvasMode === 'view'
+            ? 'bg-amber-500 text-slate-950 shadow'
+            : 'text-slate-400 hover:bg-slate-800 hover:text-amber-300'
+        }`}
+      >
+        <Hand className="w-4 h-4" />
+      </button>
+
+      {/* Edit / Select Object */}
+      <button
+        onClick={() => {
+          setCanvasMode('edit');
+          setActiveTool('select');
+        }}
+        title="Chế độ Edit — Chọn & Di chuyển đối tượng (V)"
+        className={`w-9 h-9 rounded-lg flex items-center justify-center transition ${
+          canvasMode === 'edit' && activeTool === 'select'
             ? 'bg-blue-600 text-white shadow'
             : 'text-slate-400 hover:bg-slate-800 hover:text-slate-100'
         }`}
@@ -30,11 +63,30 @@ export const LeftToolRail: React.FC = () => {
         <MousePointer2 className="w-4 h-4" />
       </button>
 
+      {/* Marquee Region Select */}
       <button
-        onClick={enterCropMode}
+        onClick={() => {
+          setCanvasMode('edit');
+          setActiveTool(activeTool === 'marquee' ? 'select' : 'marquee');
+        }}
+        title="Chọn vùng (Chữ nhật, Vuông, Tròn, Elip, Free Form) (M)"
+        className={`w-9 h-9 rounded-lg flex items-center justify-center transition ${
+          canvasMode === 'edit' && activeTool === 'marquee'
+            ? 'bg-sky-600 text-white shadow'
+            : 'text-slate-400 hover:bg-slate-800 hover:text-sky-300'
+        }`}
+      >
+        <BoxSelect className="w-4 h-4" />
+      </button>
+
+      <button
+        onClick={() => {
+          setCanvasMode('edit');
+          enterCropMode();
+        }}
         title="Cắt khung ảnh - Crop (C)"
         className={`w-9 h-9 rounded-lg flex items-center justify-center transition ${
-          activeTool === 'crop'
+          canvasMode === 'edit' && activeTool === 'crop'
             ? 'bg-blue-600 text-white shadow'
             : 'text-slate-400 hover:bg-slate-800 hover:text-slate-100'
         }`}
@@ -43,12 +95,13 @@ export const LeftToolRail: React.FC = () => {
       </button>
 
       <button
-        onClick={() =>
-          setActiveTool(activeTool === 'magic-eraser' ? 'select' : 'magic-eraser')
-        }
+        onClick={() => {
+          setCanvasMode('edit');
+          setActiveTool(activeTool === 'magic-eraser' ? 'select' : 'magic-eraser');
+        }}
         title="Magic Background Eraser (E)"
         className={`w-9 h-9 rounded-lg flex items-center justify-center transition ${
-          activeTool === 'magic-eraser'
+          canvasMode === 'edit' && activeTool === 'magic-eraser'
             ? 'bg-cyan-600 text-white shadow'
             : 'text-slate-400 hover:bg-slate-800 hover:text-cyan-300'
         }`}

@@ -7,6 +7,7 @@ import {
   applyImageAdjustmentsToCanvas,
   hasActiveAdjustments,
 } from '../../utils/imageFilters';
+import { createLayerMaskFromSelection } from '../../utils/selectionUtils';
 
 interface ImageNodeProps {
   layer: ImageLayer;
@@ -18,12 +19,14 @@ interface ImageNodeProps {
 
 export const ImageNode: React.FC<ImageNodeProps> = ({
   layer,
+  isSelected,
   interactive,
   onSelect,
   nodeRef,
 }) => {
   const [imageEl, setImageEl] = useState<HTMLImageElement | null>(null);
   const updateLayer = useEditorStore((s) => s.updateLayer);
+  const selection = useEditorStore((s) => s.selection);
 
   useEffect(() => {
     let active = true;
@@ -63,8 +66,28 @@ export const ImageNode: React.FC<ImageNodeProps> = ({
       };
     }
 
-    const filtered = applyImageAdjustmentsToCanvas(imageEl, layer.adjustments, 1600);
     const natW = imageEl.naturalWidth || imageEl.width || 1;
+    const natH = imageEl.naturalHeight || imageEl.height || 1;
+    const maxDim = 1600;
+    let targetW = natW;
+    let targetH = natH;
+    if (targetW > maxDim || targetH > maxDim) {
+      const s = Math.min(maxDim / targetW, maxDim / targetH);
+      targetW = Math.max(1, Math.round(targetW * s));
+      targetH = Math.max(1, Math.round(targetH * s));
+    }
+
+    const activeSelMask =
+      selection && isSelected
+        ? createLayerMaskFromSelection(layer, selection, targetW, targetH)
+        : undefined;
+
+    const filtered = applyImageAdjustmentsToCanvas(
+      imageEl,
+      layer.adjustments,
+      1600,
+      activeSelMask
+    );
     const scaleRatio = filtered.width / natW;
 
     return {
@@ -78,11 +101,9 @@ export const ImageNode: React.FC<ImageNodeProps> = ({
     };
   }, [
     imageEl,
-    layer.adjustments,
-    layer.cropX,
-    layer.cropY,
-    layer.cropWidth,
-    layer.cropHeight,
+    layer,
+    isSelected,
+    selection,
   ]);
 
   if (!layer.visible || !drawable) return null;

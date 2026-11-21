@@ -77,10 +77,10 @@ export const TopToolbar: React.FC<TopToolbarProps> = ({
 
   const savedTimeText = lastSavedAt
     ? new Date(lastSavedAt).toLocaleTimeString([], {
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-      })
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    })
     : null;
 
   return (
@@ -195,7 +195,7 @@ export const TopToolbar: React.FC<TopToolbarProps> = ({
           className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-md bg-blue-600 hover:bg-blue-500 text-white font-medium shadow-sm transition"
         >
           <Download className="w-3.5 h-3.5" />
-          Export PNG
+          Export Image
         </button>
       </div>
     </header>

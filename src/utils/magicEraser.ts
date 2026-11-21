@@ -1,6 +1,7 @@
-import type { ImageLayer, MagicEraserMode } from '../types/editor';
+import type { CanvasSelection, ImageLayer, MagicEraserMode } from '../types/editor';
 import { clamp } from './geometry';
 import { loadImageElement } from './fileHelpers';
+import { createLayerMaskFromSelection } from './selectionUtils';
 
 export interface ImagePixelPoint {
   px: number;
@@ -56,11 +57,15 @@ export function floodFillErase(
   height: number,
   startX: number,
   startY: number,
-  tolerance: number
+  tolerance: number,
+  selectionMask?: Uint8Array
 ): number {
   if (startX < 0 || startX >= width || startY < 0 || startY >= height) return 0;
 
-  const seedIdx = (startY * width + startX) * 4;
+  const startPos = startY * width + startX;
+  if (selectionMask && selectionMask[startPos] === 0) return 0;
+
+  const seedIdx = startPos * 4;
   if (data[seedIdx + 3] === 0) return 0;
 
   const seedR = data[seedIdx];
@@ -76,7 +81,6 @@ export function floodFillErase(
   let head = 0;
   let tail = 0;
 
-  const startPos = startY * width + startX;
   queue[tail++] = startPos;
   visited[startPos] = 1;
 
@@ -84,6 +88,7 @@ export function floodFillErase(
 
   while (head < tail) {
     const pos = queue[head++];
+    if (selectionMask && selectionMask[pos] === 0) continue;
     const idx = pos * 4;
 
     if (data[idx + 3] === 0) continue;
@@ -144,7 +149,8 @@ export function circleErase(
   centerX: number,
   centerY: number,
   radiusX: number,
-  radiusY = radiusX
+  radiusY = radiusX,
+  selectionMask?: Uint8Array
 ): number {
   const rx = Math.max(1, radiusX);
   const ry = Math.max(1, radiusY);
@@ -159,9 +165,11 @@ export function circleErase(
     const ny = (y - centerY) / ry;
     const nySq = ny * ny;
     for (let x = minX; x <= maxX; x++) {
+      const pos = y * width + x;
+      if (selectionMask && selectionMask[pos] === 0) continue;
       const nx = (x - centerX) / rx;
       if (nx * nx + nySq <= 1) {
-        const idx = (y * width + x) * 4;
+        const idx = pos * 4;
         if (data[idx + 3] !== 0) {
           data[idx + 3] = 0;
           erased += 1;
@@ -180,6 +188,7 @@ export interface EraseAtPointParams {
   mode: MagicEraserMode;
   tolerance: number;
   radius: number;
+  selection?: CanvasSelection | null;
 }
 
 /**
@@ -193,6 +202,7 @@ export async function eraseImageAtCanvasPoint({
   mode,
   tolerance,
   radius,
+  selection,
 }: EraseAtPointParams): Promise<string | null> {
   const pt = canvasPointToImagePixel(canvasX, canvasY, layer);
   if (!pt) return null;
@@ -210,13 +220,34 @@ export async function eraseImageAtCanvasPoint({
   ctx.drawImage(img, 0, 0, w, h);
   const imageData = ctx.getImageData(0, 0, w, h);
 
+  const selectionMask = selection
+    ? createLayerMaskFromSelection(layer, selection, w, h)
+    : undefined;
+
   let erased = 0;
   if (mode === 'flood') {
-    erased = floodFillErase(imageData.data, w, h, pt.px, pt.py, tolerance);
+    erased = floodFillErase(
+      imageData.data,
+      w,
+      h,
+      pt.px,
+      pt.py,
+      tolerance,
+      selectionMask
+    );
   } else {
     const rx = radius * (layer.cropWidth / Math.max(1, layer.width));
     const ry = radius * (layer.cropHeight / Math.max(1, layer.height));
-    erased = circleErase(imageData.data, w, h, pt.px, pt.py, rx, ry);
+    erased = circleErase(
+      imageData.data,
+      w,
+      h,
+      pt.px,
+      pt.py,
+      rx,
+      ry,
+      selectionMask
+    );
   }
 
   if (erased === 0) return null;

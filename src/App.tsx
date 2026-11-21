@@ -13,6 +13,7 @@ import {
   saveAutoSaveProject,
   serializeProject,
 } from './utils/projectStorage';
+import { copySelectionFromImageLayer } from './utils/selectionUtils';
 
 export function App() {
   const [newModalOpen, setNewModalOpen] = useState(false);
@@ -41,6 +42,10 @@ export function App() {
     updateLayer,
     loadProject,
     setLastSavedAt,
+    setCanvasMode,
+    clearSelection,
+    setSelectionClipboard,
+    pasteClipboardAsLayer,
   } = useEditorStore();
 
   // Restore last autosaved project from IndexedDB on mount
@@ -136,10 +141,39 @@ export function App() {
         return;
       }
 
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c') {
+        if (state.selection) {
+          e.preventDefault();
+          const selected = state.layers.find(
+            (l) => l.id === state.selectedLayerId && l.type === 'image'
+          );
+          const fallbackImg = [...state.layers]
+            .reverse()
+            .find((l) => l.type === 'image' && l.visible);
+          const targetImg = selected?.type === 'image' ? selected : fallbackImg;
+          if (targetImg && targetImg.type === 'image') {
+            copySelectionFromImageLayer(targetImg, state.selection).then((clip) => {
+              if (clip) setSelectionClipboard(clip);
+            });
+          }
+          return;
+        }
+      }
+
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'v') {
+        if (state.selectionClipboard) {
+          e.preventDefault();
+          pasteClipboardAsLayer();
+          return;
+        }
+      }
+
       if (e.key === 'Escape') {
         if (state.activeTool === 'crop') cancelCropMode();
-        if (state.activeTool === 'eyedropper') cancelEyedropper();
-        if (state.activeTool === 'magic-eraser') setActiveTool('select');
+        else if (state.activeTool === 'eyedropper') cancelEyedropper();
+        else if (state.activeTool === 'magic-eraser') setActiveTool('select');
+        else if (state.activeTool === 'marquee') setActiveTool('select');
+        else if (state.selection) clearSelection();
         return;
       }
 
@@ -149,7 +183,19 @@ export function App() {
         return;
       }
 
+      if (e.key.toLowerCase() === 'h' && !e.ctrlKey && !e.metaKey) {
+        setCanvasMode(state.canvasMode === 'view' ? 'edit' : 'view');
+        return;
+      }
+
+      if (e.key.toLowerCase() === 'm' && !e.ctrlKey && !e.metaKey) {
+        setCanvasMode('edit');
+        setActiveTool(state.activeTool === 'marquee' ? 'select' : 'marquee');
+        return;
+      }
+
       if (e.key.toLowerCase() === 'v' && !e.ctrlKey && !e.metaKey) {
+        setCanvasMode('edit');
         setActiveTool('select');
         return;
       }

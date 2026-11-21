@@ -4,6 +4,7 @@ import {
   Eraser,
   Pipette,
   Plus,
+  Power,
   RotateCcw,
   Trash2,
   Wand2,
@@ -15,6 +16,7 @@ import {
   createDefaultImageAdjustments,
   hasActiveAdjustments,
 } from '../../utils/imageFilters';
+import { CollapsibleSection } from './CollapsibleSection';
 
 interface ImageAdjustmentsPanelProps {
   layer: ImageLayer;
@@ -50,6 +52,8 @@ export const ImageAdjustmentsPanel: React.FC<ImageAdjustmentsPanelProps> = ({
     startBgRemoveEyedropper,
     setActiveTool,
     activeTool,
+    openPropertySections,
+    togglePropertySection,
     pushHistory,
   } = useEditorStore();
 
@@ -69,33 +73,63 @@ export const ImageAdjustmentsPanel: React.FC<ImageAdjustmentsPanelProps> = ({
   };
 
   return (
-    <div className="space-y-3.5 pt-3 border-t border-slate-800 text-xs">
-      {/* Remove Background */}
-      <div className="bg-[#0f1115] border border-slate-800 rounded-lg p-2.5 space-y-2.5">
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-1.5">
-            <Eraser className="w-3.5 h-3.5 text-cyan-400" />
-            <span className="font-medium text-slate-200">Remove Background</span>
+    <div className="space-y-3 text-xs">
+      {/* 3. Remove Background */}
+      <CollapsibleSection
+        title="Remove Background"
+        open={openPropertySections['bg-remove']}
+        onToggle={() => togglePropertySection('bg-remove')}
+        rightBadge={
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              aria-label="Bật hoặc tắt xóa nền"
+              aria-pressed={bgRemove.enabled}
+              title={
+                bgRemove.enabled
+                  ? 'Tắt Remove Background'
+                  : 'Bật Remove Background (#ffffff mặc định)'
+              }
+              onClick={() => updateBgRemove({ enabled: !bgRemove.enabled }, true)}
+              className={`p-1 rounded transition ${
+                bgRemove.enabled
+                  ? 'bg-cyan-600 text-white'
+                  : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
+              }`}
+            >
+              <Power className="w-3 h-3" />
+            </button>
+            <button
+              type="button"
+              aria-label="Mở Magic Background Eraser"
+              title={
+                activeTool === 'magic-eraser'
+                  ? 'Thoát Magic Background Eraser (Esc)'
+                  : 'Mở Magic Background Eraser (E)'
+              }
+              onClick={() =>
+                setActiveTool(
+                  activeTool === 'magic-eraser' ? 'select' : 'magic-eraser'
+                )
+              }
+              className={`p-1 rounded transition ${
+                activeTool === 'magic-eraser'
+                  ? 'bg-cyan-600 text-white'
+                  : 'bg-slate-800 hover:bg-slate-700 text-cyan-300'
+              }`}
+            >
+              <Wand2 className="w-3 h-3" />
+            </button>
           </div>
-          <button
-            type="button"
-            aria-pressed={bgRemove.enabled}
-            onClick={() => updateBgRemove({ enabled: !bgRemove.enabled }, true)}
-            className={`px-2.5 py-1 rounded text-[11px] font-medium transition ${
-              bgRemove.enabled
-                ? 'bg-cyan-600 text-white'
-                : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
-            }`}
-          >
-            {bgRemove.enabled ? 'Đang bật' : 'Xóa nền'}
-          </button>
-        </div>
-
+        }
+      >
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-1.5">
+            <Eraser className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
             <input
               type="color"
               aria-label="Màu nền cần xóa"
+              title="Chọn màu nền cần xóa"
               value={bgRemove.color}
               onChange={(e) =>
                 updateBgRemove({ color: e.target.value, enabled: true }, true)
@@ -114,31 +148,14 @@ export const ImageAdjustmentsPanel: React.FC<ImageAdjustmentsPanelProps> = ({
           </div>
           <button
             type="button"
+            aria-label="Hút màu xóa"
             onClick={() => startBgRemoveEyedropper(layer.id)}
             title="Hút màu trên ảnh để xóa thành trong suốt"
-            className="flex items-center gap-1 px-2 py-1 rounded bg-slate-800 hover:bg-blue-600 text-slate-200 transition"
+            className="p-1.5 rounded bg-slate-800 hover:bg-blue-600 text-slate-200 transition"
           >
             <Pipette className="w-3.5 h-3.5" />
-            <span>Hút màu xóa</span>
           </button>
         </div>
-
-        <button
-          type="button"
-          onClick={() =>
-            setActiveTool(activeTool === 'magic-eraser' ? 'select' : 'magic-eraser')
-          }
-          className={`w-full flex items-center justify-center gap-1.5 py-1.5 rounded border text-[11px] font-medium transition ${
-            activeTool === 'magic-eraser'
-              ? 'bg-cyan-600/25 border-cyan-500 text-cyan-200'
-              : 'bg-[#181b22] border-slate-700 hover:border-cyan-500/60 text-slate-300'
-          }`}
-        >
-          <Wand2 className="w-3.5 h-3.5 text-cyan-400" />
-          {activeTool === 'magic-eraser'
-            ? 'Đang bật Magic Eraser (Esc để thoát)'
-            : 'Mở Magic Background Eraser'}
-        </button>
 
         {bgRemove.enabled && (
           <div className="space-y-2 pt-1 border-t border-slate-800/80">
@@ -181,22 +198,27 @@ export const ImageAdjustmentsPanel: React.FC<ImageAdjustmentsPanelProps> = ({
             </div>
           </div>
         )}
-      </div>
+      </CollapsibleSection>
 
-      <div className="flex items-center justify-between">
-        <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-          Chỉnh màu & Ánh sáng
-        </span>
-        {modified && (
-          <button
-            type="button"
-            onClick={() => resetImageAdjustments(layer.id)}
-            className="flex items-center gap-1 px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px]"
-          >
-            <RotateCcw className="w-3 h-3" /> Reset
-          </button>
-        )}
-      </div>
+      {/* 4. Color & Light Adjustments */}
+      <CollapsibleSection
+        title="Chỉnh màu & Ánh sáng"
+        open={openPropertySections['color-adjust']}
+        onToggle={() => togglePropertySection('color-adjust')}
+        rightBadge={
+          modified ? (
+            <button
+              type="button"
+              aria-label="Reset chỉnh màu"
+              title="Đặt lại toàn bộ chỉnh màu"
+              onClick={() => resetImageAdjustments(layer.id)}
+              className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px]"
+            >
+              <RotateCcw className="w-3 h-3" /> Reset
+            </button>
+          ) : undefined
+        }
+      >
 
       {/* Sliders */}
       <div className="space-y-2.5">
@@ -384,6 +406,7 @@ export const ImageAdjustmentsPanel: React.FC<ImageAdjustmentsPanelProps> = ({
           </div>
         )}
       </div>
+      </CollapsibleSection>
     </div>
   );
 };
