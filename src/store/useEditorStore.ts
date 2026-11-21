@@ -11,6 +11,7 @@ import type {
   ImageAdjustments,
   ImageLayer,
   Layer,
+  PanelLayoutConfig,
   ProjectFile,
   ToolType,
 } from '../types/editor';
@@ -66,6 +67,7 @@ export interface EditorState {
   activeTool: ToolType;
   zoom: number;
   alphaPreviewMode: AlphaPreviewMode;
+  panelLayout: PanelLayoutConfig;
   cropRect: CropRect | null;
   cropAspect: number | null;
   eyedropperTarget: EyedropperTarget | null;
@@ -136,6 +138,11 @@ export interface EditorState {
   setActiveTool: (tool: ToolType) => void;
   setZoom: (zoom: number) => void;
   setAlphaPreviewMode: (mode: AlphaPreviewMode) => void;
+  setPanelLayout: (
+    updater:
+      | Partial<PanelLayoutConfig>
+      | ((prev: PanelLayoutConfig) => PanelLayoutConfig)
+  ) => void;
   startEyedropper: (layerId: string, stopId: string) => void;
   startFogFadeEyedropper: (layerId: string) => void;
   startColorEditEyedropper: (
@@ -153,6 +160,46 @@ const DEFAULT_CANVAS: CanvasConfig = {
   backgroundColor: null,
 };
 
+const PANEL_STORAGE_KEY = 'mistcanvas_panel_layout';
+
+export const DEFAULT_PANEL_LAYOUT: PanelLayoutConfig = {
+  mode: 'merged',
+  rightWidth: 310,
+  leftLayersWidth: 260,
+  splitRatio: 0.58,
+};
+
+function loadInitialPanelLayout(): PanelLayoutConfig {
+  try {
+    const raw =
+      typeof localStorage !== 'undefined' && typeof localStorage.getItem === 'function'
+        ? localStorage.getItem(PANEL_STORAGE_KEY)
+        : null;
+    if (raw) {
+      const parsed = JSON.parse(raw) as Partial<PanelLayoutConfig>;
+      return {
+        mode: parsed.mode === 'split' ? 'split' : 'merged',
+        rightWidth: clamp(Number(parsed.rightWidth) || 310, 250, 560),
+        leftLayersWidth: clamp(Number(parsed.leftLayersWidth) || 260, 200, 440),
+        splitRatio: clamp(Number(parsed.splitRatio) || 0.58, 0.2, 0.8),
+      };
+    }
+  } catch {
+    // ignore storage errors
+  }
+  return { ...DEFAULT_PANEL_LAYOUT };
+}
+
+function persistPanelLayout(layout: PanelLayoutConfig): void {
+  try {
+    if (typeof localStorage !== 'undefined' && typeof localStorage.setItem === 'function') {
+      localStorage.setItem(PANEL_STORAGE_KEY, JSON.stringify(layout));
+    }
+  } catch {
+    // ignore storage errors
+  }
+}
+
 export const useEditorStore = create<EditorState>((set, get) => ({
   projectName: 'Untitled Project',
   lastSavedAt: null,
@@ -163,6 +210,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   activeTool: 'select',
   zoom: 1,
   alphaPreviewMode: 'checker-dark',
+  panelLayout: loadInitialPanelLayout(),
   cropRect: null,
   cropAspect: null,
   eyedropperTarget: null,
@@ -217,19 +265,43 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   setLastExportName: (name) => set({ lastExportName: name }),
 
   loadProject: (project) => {
-    set({
+    const env = project.environment;
+    const nextPanelLayout: PanelLayoutConfig = env?.panelLayout
+      ? {
+          mode: env.panelLayout.mode === 'split' ? 'split' : 'merged',
+          rightWidth: clamp(Number(env.panelLayout.rightWidth) || 310, 250, 560),
+          leftLayersWidth: clamp(Number(env.panelLayout.leftLayersWidth) || 260, 200, 440),
+          splitRatio: clamp(Number(env.panelLayout.splitRatio) || 0.58, 0.2, 0.8),
+        }
+      : get().panelLayout;
+
+    if (env?.panelLayout) {
+      persistPanelLayout(nextPanelLayout);
+    }
+
+    const fallbackSelected = project.layers[project.layers.length - 1]?.id ?? null;
+    const validSelected =
+      env?.selectedLayerId &&
+      project.layers.some((l) => l.id === env.selectedLayerId)
+        ? env.selectedLayerId
+        : fallbackSelected;
+
+    set((state) => ({
       projectName: project.name || 'Untitled Project',
       lastSavedAt: project.savedAt ?? null,
-      lastExportName: null,
+      lastExportName: env?.lastExportName ?? null,
       canvas: { ...project.canvas },
       layers: project.layers,
-      selectedLayerId: project.layers[project.layers.length - 1]?.id ?? null,
+      selectedLayerId: validSelected,
+      zoom: typeof env?.zoom === 'number' ? clamp(env.zoom, 0.1, 5) : state.zoom,
+      alphaPreviewMode: env?.alphaPreviewMode ?? state.alphaPreviewMode,
+      panelLayout: nextPanelLayout,
       activeTool: 'select',
       cropRect: null,
       eyedropperTarget: null,
       past: [],
       future: [],
-    });
+    }));
   },
 
   newCanvas: (width, height, backgroundColor, projectName) => {
@@ -699,6 +771,16 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   setZoom: (zoom) => set({ zoom: clamp(zoom, 0.1, 5) }),
 
   setAlphaPreviewMode: (mode) => set({ alphaPreviewMode: mode }),
+
+  setPanelLayout: (updater) =>
+    set((state) => {
+      const next =
+        typeof updater === 'function'
+          ? updater(state.panelLayout)
+          : { ...state.panelLayout, ...updater };
+      persistPanelLayout(next);
+      return { panelLayout: next };
+    }),
 
   startEyedropper: (layerId, stopId) =>
     set({

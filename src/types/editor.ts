@@ -135,12 +135,30 @@ export interface EditorSnapshot {
   selectedLayerId: string | null;
 }
 
+export type PanelMode = 'merged' | 'split';
+
+export interface PanelLayoutConfig {
+  mode: PanelMode;
+  rightWidth: number;
+  leftLayersWidth: number;
+  splitRatio: number;
+}
+
+export interface EditorEnvironment {
+  panelLayout: PanelLayoutConfig;
+  zoom: number;
+  alphaPreviewMode: AlphaPreviewMode;
+  selectedLayerId: string | null;
+  lastExportName: string | null;
+}
+
 export interface ProjectFile {
   version: 1;
   name: string;
   savedAt: string;
   canvas: CanvasConfig;
   layers: Layer[];
+  environment?: EditorEnvironment;
 }
 
 export type ExportFormat = 'image/png' | 'image/jpeg' | 'image/webp';

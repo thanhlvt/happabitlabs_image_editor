@@ -1,44 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { Columns2, Rows2 } from 'lucide-react';
 import { PropertiesPanel } from './PropertiesPanel';
 import { LayerPanel } from './LayerPanel';
-
-export type PanelMode = 'merged' | 'split';
-
-interface StoredLayout {
-  mode: PanelMode;
-  rightWidth: number;
-  leftLayersWidth: number;
-  splitRatio: number;
-}
-
-const STORAGE_KEY = 'mistcanvas_panel_layout';
+import { useEditorStore } from '../../store/useEditorStore';
 
 function clampNum(v: number, min: number, max: number): number {
   return Math.min(Math.max(v, min), max);
-}
-
-function loadStoredLayout(): StoredLayout {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw) as Partial<StoredLayout>;
-      return {
-        mode: parsed.mode === 'split' ? 'split' : 'merged',
-        rightWidth: clampNum(Number(parsed.rightWidth) || 310, 250, 560),
-        leftLayersWidth: clampNum(Number(parsed.leftLayersWidth) || 260, 200, 440),
-        splitRatio: clampNum(Number(parsed.splitRatio) || 0.58, 0.2, 0.8),
-      };
-    }
-  } catch {
-    // ignore storage errors
-  }
-  return {
-    mode: 'merged',
-    rightWidth: 310,
-    leftLayersWidth: 260,
-    splitRatio: 0.58,
-  };
 }
 
 interface WorkspacePanelsProps {
@@ -50,15 +17,8 @@ export const WorkspacePanels: React.FC<WorkspacePanelsProps> = ({
   canvasSlot,
   onOpenResizeModal,
 }) => {
-  const [layout, setLayout] = useState<StoredLayout>(loadStoredLayout);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(layout));
-    } catch {
-      // ignore storage errors
-    }
-  }, [layout]);
+  const layout = useEditorStore((s) => s.panelLayout);
+  const setPanelLayout = useEditorStore((s) => s.setPanelLayout);
 
   const startDrag = (
     e: React.PointerEvent,
@@ -81,7 +41,7 @@ export const WorkspacePanels: React.FC<WorkspacePanelsProps> = ({
   };
 
   const toggleMode = () =>
-    setLayout((prev) => ({
+    setPanelLayout((prev) => ({
       ...prev,
       mode: prev.mode === 'merged' ? 'split' : 'merged',
     }));
@@ -116,7 +76,7 @@ export const WorkspacePanels: React.FC<WorkspacePanelsProps> = ({
             onPointerDown={(e) => {
               const initial = layout.leftLayersWidth;
               startDrag(e, (dx) =>
-                setLayout((prev) => ({
+                setPanelLayout((prev) => ({
                   ...prev,
                   leftLayersWidth: clampNum(initial + dx, 200, 440),
                 }))
@@ -143,7 +103,7 @@ export const WorkspacePanels: React.FC<WorkspacePanelsProps> = ({
           onPointerDown={(e) => {
             const initial = layout.rightWidth;
             startDrag(e, (dx) =>
-              setLayout((prev) => ({
+              setPanelLayout((prev) => ({
                 ...prev,
                 rightWidth: clampNum(initial - dx, 250, 560),
               }))
@@ -200,7 +160,7 @@ export const WorkspacePanels: React.FC<WorkspacePanelsProps> = ({
                 const totalH = parent?.clientHeight || 600;
                 const initialRatio = layout.splitRatio;
                 startDrag(e, (_dx, dy) =>
-                  setLayout((prev) => ({
+                  setPanelLayout((prev) => ({
                     ...prev,
                     splitRatio: clampNum(initialRatio + dy / totalH, 0.2, 0.8),
                   }))

@@ -31,8 +31,13 @@ export const TopToolbar: React.FC<TopToolbarProps> = ({
   const {
     projectName,
     lastSavedAt,
+    lastExportName,
     canvas,
     layers,
+    panelLayout,
+    zoom,
+    alphaPreviewMode,
+    selectedLayerId,
     past,
     future,
     undo,
@@ -59,7 +64,13 @@ export const TopToolbar: React.FC<TopToolbarProps> = ({
   };
 
   const handleSaveProject = () => {
-    const project = serializeProject(projectName, canvas, layers);
+    const project = serializeProject(projectName, canvas, layers, {
+      panelLayout,
+      zoom,
+      alphaPreviewMode,
+      selectedLayerId,
+      lastExportName,
+    });
     downloadProjectFile(project);
     setLastSavedAt(project.savedAt);
   };

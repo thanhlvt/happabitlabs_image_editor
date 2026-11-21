@@ -22,8 +22,13 @@ export function App() {
 
   const {
     projectName,
+    lastExportName,
     canvas,
     layers,
+    panelLayout,
+    zoom,
+    alphaPreviewMode,
+    selectedLayerId,
     undo,
     redo,
     setActiveTool,
@@ -53,18 +58,34 @@ export function App() {
     };
   }, [loadProject]);
 
-  // Auto-save to IndexedDB whenever projectName, canvas, or layers change
+  // Auto-save to IndexedDB whenever project content or editor environment changes
   useEffect(() => {
     if (!hydratedRef.current) return;
     const timer = window.setTimeout(async () => {
-      const project = serializeProject(projectName, canvas, layers);
+      const project = serializeProject(projectName, canvas, layers, {
+        panelLayout,
+        zoom,
+        alphaPreviewMode,
+        selectedLayerId,
+        lastExportName,
+      });
       const ok = await saveAutoSaveProject(project);
       if (ok) {
         setLastSavedAt(project.savedAt);
       }
     }, 500);
     return () => window.clearTimeout(timer);
-  }, [projectName, canvas, layers, setLastSavedAt]);
+  }, [
+    projectName,
+    canvas,
+    layers,
+    panelLayout,
+    zoom,
+    alphaPreviewMode,
+    selectedLayerId,
+    lastExportName,
+    setLastSavedAt,
+  ]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -82,7 +103,14 @@ export function App() {
         const project = serializeProject(
           state.projectName,
           state.canvas,
-          state.layers
+          state.layers,
+          {
+            panelLayout: state.panelLayout,
+            zoom: state.zoom,
+            alphaPreviewMode: state.alphaPreviewMode,
+            selectedLayerId: state.selectedLayerId,
+            lastExportName: state.lastExportName,
+          }
         );
         downloadProjectFile(project);
         state.setLastSavedAt(project.savedAt);

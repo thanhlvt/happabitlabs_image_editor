@@ -70,4 +70,44 @@ describe('projectStorage', () => {
     expect(state.past).toHaveLength(0);
     expect(state.future).toHaveLength(0);
   });
+
+  it('serializes, parses, and restores EditorEnvironment including panelLayout', () => {
+    const project = serializeProject(
+      'Studio Workspace',
+      { width: 1920, height: 1080, backgroundColor: null },
+      [],
+      {
+        panelLayout: {
+          mode: 'split',
+          rightWidth: 380,
+          leftLayersWidth: 290,
+          splitRatio: 0.65,
+        },
+        zoom: 0.75,
+        alphaPreviewMode: 'checker-light',
+        selectedLayerId: null,
+        lastExportName: 'hero-banner-v3',
+      }
+    );
+
+    const parsed = parseProjectFile(JSON.stringify(project));
+    expect(parsed.environment?.panelLayout).toEqual({
+      mode: 'split',
+      rightWidth: 380,
+      leftLayersWidth: 290,
+      splitRatio: 0.65,
+    });
+
+    useEditorStore.getState().loadProject(parsed);
+    const state = useEditorStore.getState();
+    expect(state.panelLayout).toEqual({
+      mode: 'split',
+      rightWidth: 380,
+      leftLayersWidth: 290,
+      splitRatio: 0.65,
+    });
+    expect(state.zoom).toBe(0.75);
+    expect(state.alphaPreviewMode).toBe('checker-light');
+    expect(state.lastExportName).toBe('hero-banner-v3');
+  });
 });

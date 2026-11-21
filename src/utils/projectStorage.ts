@@ -1,4 +1,9 @@
-import type { CanvasConfig, Layer, ProjectFile } from '../types/editor';
+import type {
+  CanvasConfig,
+  EditorEnvironment,
+  Layer,
+  ProjectFile,
+} from '../types/editor';
 
 const DB_NAME = 'mistcanvas_db';
 const DB_VERSION = 1;
@@ -8,7 +13,8 @@ const AUTOSAVE_KEY = 'current_autosave';
 export function serializeProject(
   name: string,
   canvas: CanvasConfig,
-  layers: Layer[]
+  layers: Layer[],
+  environment?: EditorEnvironment
 ): ProjectFile {
   return {
     version: 1,
@@ -28,6 +34,14 @@ export function serializeProject(
               : undefined,
           }
     ),
+    ...(environment
+      ? {
+          environment: {
+            ...environment,
+            panelLayout: { ...environment.panelLayout },
+          },
+        }
+      : {}),
   };
 }
 
@@ -59,6 +73,11 @@ export function parseProjectFile(jsonText: string): ProjectFile {
     throw new Error('Danh sách layer trong file project không hợp lệ.');
   }
 
+  const env =
+    obj.environment && typeof obj.environment === 'object'
+      ? (obj.environment as EditorEnvironment)
+      : undefined;
+
   return {
     version: 1,
     name: typeof obj.name === 'string' && obj.name.trim() ? obj.name : 'Imported Project',
@@ -70,6 +89,7 @@ export function parseProjectFile(jsonText: string): ProjectFile {
         typeof canvas.backgroundColor === 'string' ? canvas.backgroundColor : null,
     },
     layers: obj.layers as Layer[],
+    ...(env ? { environment: env } : {}),
   };
 }
 
