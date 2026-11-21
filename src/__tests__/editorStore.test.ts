@@ -90,6 +90,15 @@ describe('useEditorStore', () => {
     // Reorder fog layer down
     useEditorStore.getState().moveLayerOrder(fog.id, 'down');
     expect(useEditorStore.getState().layers[0].id).toBe(fog.id);
+
+    // Drag-and-drop reorderLayers back to top, then undo
+    const bottomId = useEditorStore.getState().layers[0].id;
+    const topId = useEditorStore.getState().layers[1].id;
+    useEditorStore.getState().reorderLayers(bottomId, topId);
+    expect(useEditorStore.getState().layers[1].id).toBe(bottomId);
+
+    useEditorStore.getState().undo();
+    expect(useEditorStore.getState().layers[0].id).toBe(bottomId);
   });
 
   it('supports Undo and Redo across resize and crop', () => {

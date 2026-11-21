@@ -251,4 +251,26 @@ describe('Editor UI Components', () => {
     fireEvent.click(screen.getAllByText('Gộp chung')[0]);
     expect(screen.getByText('Thuộc tính & Layers')).toBeInTheDocument();
   });
+
+  it('LayerPanel supports drag-and-drop reordering of layers', () => {
+    useEditorStore.getState().addFogLayer('white-mist');
+    useEditorStore.getState().addFogLayer('dark-cinematic');
+
+    const initialLayers = useEditorStore.getState().layers;
+    const firstId = initialLayers[0].id;
+    const secondId = initialLayers[1].id;
+
+    render(<LayerPanel />);
+
+    const firstEl = screen.getByTestId(`layer-item-${firstId}`);
+    const secondEl = screen.getByTestId(`layer-item-${secondId}`);
+
+    fireEvent.dragStart(firstEl);
+    fireEvent.dragOver(secondEl);
+    fireEvent.drop(secondEl);
+
+    const reordered = useEditorStore.getState().layers;
+    expect(reordered[0].id).toBe(secondId);
+    expect(reordered[1].id).toBe(firstId);
+  });
 });

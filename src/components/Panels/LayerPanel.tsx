@@ -6,6 +6,7 @@ import {
   Copy,
   Eye,
   EyeOff,
+  GripVertical,
   ImagePlus,
   Lock,
   Trash2,
@@ -24,12 +25,15 @@ export const LayerPanel: React.FC = () => {
     deleteLayer,
     duplicateLayer,
     moveLayerOrder,
+    reorderLayers,
     insertImages,
     addFogLayer,
   } = useEditorStore();
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draftName, setDraftName] = useState('');
+  const [draggedId, setDraggedId] = useState<string | null>(null);
+  const [dragOverId, setDragOverId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const handleInsert = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -92,16 +96,51 @@ export const LayerPanel: React.FC = () => {
                     .join(', ')})`
                 : undefined;
 
+            const isDragging = draggedId === layer.id;
+            const isDragOver = dragOverId === layer.id && draggedId !== layer.id;
+
             return (
               <div
                 key={layer.id}
+                data-testid={`layer-item-${layer.id}`}
+                draggable={editingId !== layer.id}
+                onDragStart={(e) => {
+                  setDraggedId(layer.id);
+                  e.dataTransfer?.setData('text/plain', layer.id);
+                  if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move';
+                }}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+                  if (dragOverId !== layer.id) setDragOverId(layer.id);
+                }}
+                onDragLeave={() => {
+                  if (dragOverId === layer.id) setDragOverId(null);
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  const sourceId =
+                    draggedId || e.dataTransfer?.getData('text/plain') || '';
+                  if (sourceId && sourceId !== layer.id) {
+                    reorderLayers(sourceId, layer.id);
+                  }
+                  setDraggedId(null);
+                  setDragOverId(null);
+                }}
+                onDragEnd={() => {
+                  setDraggedId(null);
+                  setDragOverId(null);
+                }}
                 onClick={() => setSelectedLayer(layer.id)}
                 className={`group flex items-center gap-2 px-2 py-1.5 rounded-lg border cursor-pointer transition ${
-                  isSelected
+                  isDragOver
+                    ? 'border-cyan-400 bg-cyan-500/15'
+                    : isSelected
                     ? 'bg-blue-600/15 border-blue-500/70 text-slate-100'
                     : 'bg-[#12151b] border-transparent hover:border-slate-800 text-slate-300'
-                }`}
+                } ${isDragging ? 'opacity-45' : ''}`}
               >
+                <GripVertical className="w-3.5 h-3.5 text-slate-600 group-hover:text-slate-400 shrink-0 cursor-grab active:cursor-grabbing" />
                 {/* Thumbnail */}
                 <div className="w-8 h-8 rounded border border-slate-700 checker-sm overflow-hidden shrink-0 flex items-center justify-center">
                   {layer.type === 'image' ? (

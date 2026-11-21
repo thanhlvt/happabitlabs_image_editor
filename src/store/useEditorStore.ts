@@ -132,6 +132,7 @@ export interface EditorState {
   deleteLayer: (id: string) => void;
   duplicateLayer: (id: string) => void;
   moveLayerOrder: (id: string, direction: 'up' | 'down' | 'top' | 'bottom') => void;
+  reorderLayers: (sourceId: string, targetId: string) => void;
   setSelectedLayer: (id: string | null) => void;
 
   // UI & tool actions
@@ -756,6 +757,20 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const next = [...layers];
     const [item] = next.splice(idx, 1);
     next.splice(targetIdx, 0, item);
+    set({ layers: next });
+  },
+
+  reorderLayers: (sourceId, targetId) => {
+    if (sourceId === targetId) return;
+    const { layers } = get();
+    const fromIdx = layers.findIndex((l) => l.id === sourceId);
+    const toIdx = layers.findIndex((l) => l.id === targetId);
+    if (fromIdx === -1 || toIdx === -1) return;
+
+    get().pushHistory();
+    const next = [...layers];
+    const [moved] = next.splice(fromIdx, 1);
+    next.splice(toIdx, 0, moved);
     set({ layers: next });
   },
 
