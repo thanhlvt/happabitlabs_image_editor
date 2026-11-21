@@ -119,7 +119,9 @@ export interface FogLayer extends BaseLayer {
 
 export type Layer = ImageLayer | FogLayer;
 
-export type ToolType = 'select' | 'crop' | 'eyedropper';
+export type ToolType = 'select' | 'crop' | 'eyedropper' | 'magic-eraser';
+
+export type MagicEraserMode = 'flood' | 'circle';
 
 export type AlphaPreviewMode = 'checker-dark' | 'checker-light' | 'solid-black';
 
@@ -135,11 +137,11 @@ export type EyedropperTarget =
   | { kind: 'fog-fade'; layerId: string }
   | { kind: 'bg-remove'; layerId: string }
   | {
-      kind: 'color-edit';
-      layerId: string;
-      ruleId: string;
-      field: 'sourceColor' | 'targetColor';
-    };
+    kind: 'color-edit';
+    layerId: string;
+    ruleId: string;
+    field: 'sourceColor' | 'targetColor';
+  };
 
 export interface EditorSnapshot {
   canvas: CanvasConfig;

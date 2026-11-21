@@ -6,6 +6,7 @@ import {
   Plus,
   RotateCcw,
   Trash2,
+  Wand2,
 } from 'lucide-react';
 import type { ImageAdjustments, ImageLayer } from '../../types/editor';
 import { useEditorStore } from '../../store/useEditorStore';
@@ -47,6 +48,8 @@ export const ImageAdjustmentsPanel: React.FC<ImageAdjustmentsPanelProps> = ({
     removeColorEditRule,
     startColorEditEyedropper,
     startBgRemoveEyedropper,
+    setActiveTool,
+    activeTool,
     pushHistory,
   } = useEditorStore();
 
@@ -119,6 +122,23 @@ export const ImageAdjustmentsPanel: React.FC<ImageAdjustmentsPanelProps> = ({
             <span>Hút màu xóa</span>
           </button>
         </div>
+
+        <button
+          type="button"
+          onClick={() =>
+            setActiveTool(activeTool === 'magic-eraser' ? 'select' : 'magic-eraser')
+          }
+          className={`w-full flex items-center justify-center gap-1.5 py-1.5 rounded border text-[11px] font-medium transition ${
+            activeTool === 'magic-eraser'
+              ? 'bg-cyan-600/25 border-cyan-500 text-cyan-200'
+              : 'bg-[#181b22] border-slate-700 hover:border-cyan-500/60 text-slate-300'
+          }`}
+        >
+          <Wand2 className="w-3.5 h-3.5 text-cyan-400" />
+          {activeTool === 'magic-eraser'
+            ? 'Đang bật Magic Eraser (Esc để thoát)'
+            : 'Mở Magic Background Eraser'}
+        </button>
 
         {bgRemove.enabled && (
           <div className="space-y-2 pt-1 border-t border-slate-800/80">

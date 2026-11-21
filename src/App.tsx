@@ -139,6 +139,7 @@ export function App() {
       if (e.key === 'Escape') {
         if (state.activeTool === 'crop') cancelCropMode();
         if (state.activeTool === 'eyedropper') cancelEyedropper();
+        if (state.activeTool === 'magic-eraser') setActiveTool('select');
         return;
       }
 
@@ -150,6 +151,13 @@ export function App() {
 
       if (e.key.toLowerCase() === 'v' && !e.ctrlKey && !e.metaKey) {
         setActiveTool('select');
+        return;
+      }
+
+      if (e.key.toLowerCase() === 'e' && !e.ctrlKey && !e.metaKey) {
+        setActiveTool(
+          state.activeTool === 'magic-eraser' ? 'select' : 'magic-eraser'
+        );
         return;
       }
 

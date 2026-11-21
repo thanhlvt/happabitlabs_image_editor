@@ -11,6 +11,7 @@ import type {
   ImageAdjustments,
   ImageLayer,
   Layer,
+  MagicEraserMode,
   PanelLayoutConfig,
   ProjectFile,
   ToolType,
@@ -71,6 +72,9 @@ export interface EditorState {
   cropRect: CropRect | null;
   cropAspect: number | null;
   eyedropperTarget: EyedropperTarget | null;
+  magicEraserMode: MagicEraserMode;
+  magicEraserTolerance: number;
+  magicEraserRadius: number;
 
   past: EditorSnapshot[];
   future: EditorSnapshot[];
@@ -154,6 +158,9 @@ export interface EditorState {
   ) => void;
   pickEyedropperColor: (hex: string) => void;
   cancelEyedropper: () => void;
+  setMagicEraserMode: (mode: MagicEraserMode) => void;
+  setMagicEraserTolerance: (tolerance: number) => void;
+  setMagicEraserRadius: (radius: number) => void;
 }
 
 const DEFAULT_CANVAS: CanvasConfig = {
@@ -216,6 +223,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   cropRect: null,
   cropAspect: null,
   eyedropperTarget: null,
+  magicEraserMode: 'flood',
+  magicEraserTolerance: 25,
+  magicEraserRadius: 30,
   past: [],
   future: [],
 
@@ -873,4 +883,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       activeTool: 'select',
       eyedropperTarget: null,
     }),
+
+  setMagicEraserMode: (mode) => set({ magicEraserMode: mode }),
+
+  setMagicEraserTolerance: (tolerance) =>
+    set({ magicEraserTolerance: clamp(tolerance, 1, 100) }),
+
+  setMagicEraserRadius: (radius) =>
+    set({ magicEraserRadius: clamp(radius, 5, 200) }),
 }));

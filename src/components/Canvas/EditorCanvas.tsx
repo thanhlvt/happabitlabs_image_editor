@@ -6,6 +6,7 @@ import {
   Maximize2,
   Pipette,
   Upload,
+  Wand2,
   X,
   ZoomIn,
   ZoomOut,
@@ -17,6 +18,10 @@ import { CropOverlay } from './CropOverlay';
 import { readLocalImageFile } from '../../utils/fileHelpers';
 import { renderCompositeCanvas } from '../../utils/exportCanvas';
 import { rgbToHex } from '../../utils/fogRenderer';
+import {
+  canvasPointToImagePixel,
+  eraseImageAtCanvasPoint,
+} from '../../utils/magicEraser';
 
 const CROP_RATIOS: Array<{ label: string; value: number | null }> = [
   { label: 'Free', value: null },
@@ -46,6 +51,14 @@ export const EditorCanvas: React.FC = () => {
     insertImages,
     pickEyedropperColor,
     cancelEyedropper,
+    magicEraserMode,
+    magicEraserTolerance,
+    magicEraserRadius,
+    setMagicEraserMode,
+    setMagicEraserTolerance,
+    setMagicEraserRadius,
+    setActiveTool,
+    updateLayer,
   } = useEditorStore();
 
   const viewportRef = useRef<HTMLDivElement | null>(null);
@@ -56,6 +69,8 @@ export const EditorCanvas: React.FC = () => {
   const [isDraggingFile, setIsDraggingFile] = useState(false);
   const [eyedropperCanvas, setEyedropperCanvas] = useState<HTMLCanvasElement | null>(null);
   const [hoverColor, setHoverColor] = useState<string | null>(null);
+  const [eraserHoverPos, setEraserHoverPos] = useState<{ x: number; y: number } | null>(null);
+  const [erasing, setErasing] = useState(false);
 
   const selectedLayer = layers.find((l) => l.id === selectedLayerId) ?? null;
 
@@ -231,10 +246,88 @@ export const EditorCanvas: React.FC = () => {
         </div>
       )}
 
+      {/* Magic Background Eraser Bar */}
+      {activeTool === 'magic-eraser' && (
+        <div className="fixed top-14 left-1/2 -translate-x-1/2 z-30 flex items-center gap-2.5 bg-[#1c2029]/95 backdrop-blur border border-cyan-500/60 px-3.5 py-1.5 rounded-lg shadow-xl text-xs">
+          <Wand2 className="w-4 h-4 text-cyan-400 shrink-0" />
+          <div className="flex bg-[#0f1115] rounded-md p-0.5 border border-slate-800">
+            <button
+              type="button"
+              onClick={() => setMagicEraserMode('flood')}
+              className={`px-2 py-0.5 rounded text-[11px] transition ${
+                magicEraserMode === 'flood'
+                  ? 'bg-cyan-600 text-white'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              Loang màu (Ngưỡng)
+            </button>
+            <button
+              type="button"
+              onClick={() => setMagicEraserMode('circle')}
+              className={`px-2 py-0.5 rounded text-[11px] transition ${
+                magicEraserMode === 'circle'
+                  ? 'bg-cyan-600 text-white'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              Hình tròn (Radius)
+            </button>
+          </div>
+
+          {magicEraserMode === 'flood' ? (
+            <div className="flex items-center gap-2">
+              <span className="text-slate-300">Ngưỡng:</span>
+              <input
+                type="range"
+                aria-label="Ngưỡng loang màu"
+                min={1}
+                max={100}
+                value={magicEraserTolerance}
+                onChange={(e) => setMagicEraserTolerance(Number(e.target.value))}
+                className="w-24 accent-cyan-400"
+              />
+              <span className="font-mono text-cyan-300 w-9">
+                {magicEraserTolerance}%
+              </span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2">
+              <span className="text-slate-300">Radius:</span>
+              <input
+                type="range"
+                aria-label="Bán kính xóa tròn"
+                min={5}
+                max={200}
+                value={magicEraserRadius}
+                onChange={(e) => setMagicEraserRadius(Number(e.target.value))}
+                className="w-24 accent-cyan-400"
+              />
+              <span className="font-mono text-cyan-300 w-11">
+                {magicEraserRadius}px
+              </span>
+            </div>
+          )}
+
+          <button
+            type="button"
+            onClick={() => {
+              setEraserHoverPos(null);
+              setActiveTool('select');
+            }}
+            className="px-2 py-0.5 rounded bg-slate-700 hover:bg-slate-600 text-slate-200"
+          >
+            Thoát (Esc)
+          </button>
+        </div>
+      )}
+
       {/* Canvas Container */}
       <div
         className={`relative shrink-0 m-auto shadow-[0_0_40px_rgba(0,0,0,0.65)] ring-1 ring-slate-700/80 ${bgClass} ${
-          activeTool === 'eyedropper' ? 'cursor-crosshair' : ''
+          activeTool === 'eyedropper' || activeTool === 'magic-eraser'
+            ? 'cursor-crosshair'
+            : ''
         }`}
         style={{
           width: stageWidth,
@@ -242,6 +335,7 @@ export const EditorCanvas: React.FC = () => {
           minWidth: stageWidth,
           minHeight: stageHeight,
         }}
+        onMouseLeave={() => setEraserHoverPos(null)}
       >
         <div className="pointer-events-none absolute -top-6 left-0 text-[11px] font-mono text-slate-400">
           {canvas.width} × {canvas.height} px
@@ -251,7 +345,7 @@ export const EditorCanvas: React.FC = () => {
           height={stageHeight}
           scaleX={zoom}
           scaleY={zoom}
-          onMouseDown={(e) => {
+          onMouseDown={async (e) => {
             if (activeTool === 'eyedropper') {
               const pos = e.target.getStage()?.getPointerPosition();
               if (pos) {
@@ -260,15 +354,71 @@ export const EditorCanvas: React.FC = () => {
               }
               return;
             }
+            if (activeTool === 'magic-eraser') {
+              if (erasing) return;
+              const pos = e.target.getStage()?.getPointerPosition();
+              if (!pos) return;
+              const canvasX = pos.x / zoom;
+              const canvasY = pos.y / zoom;
+
+              // Use selected image layer if valid, else pick top-most image layer under cursor
+              let target =
+                selectedLayer?.type === 'image' &&
+                selectedLayer.visible &&
+                !selectedLayer.locked
+                  ? selectedLayer
+                  : null;
+              if (!target) {
+                for (let i = layers.length - 1; i >= 0; i--) {
+                  const l = layers[i];
+                  if (
+                    l.type === 'image' &&
+                    l.visible &&
+                    !l.locked &&
+                    canvasPointToImagePixel(canvasX, canvasY, l) !== null
+                  ) {
+                    target = l;
+                    break;
+                  }
+                }
+              }
+              if (!target) return;
+
+              setErasing(true);
+              try {
+                const newSrc = await eraseImageAtCanvasPoint({
+                  layer: target,
+                  canvasX,
+                  canvasY,
+                  mode: magicEraserMode,
+                  tolerance: magicEraserTolerance,
+                  radius: magicEraserRadius,
+                });
+                if (newSrc) {
+                  updateLayer(target.id, { src: newSrc }, true);
+                }
+              } finally {
+                setErasing(false);
+              }
+              return;
+            }
             if (e.target === e.target.getStage()) {
               setSelectedLayer(null);
             }
           }}
           onMouseMove={(e) => {
-            if (activeTool !== 'eyedropper') return;
-            const pos = e.target.getStage()?.getPointerPosition();
-            if (pos) {
-              setHoverColor(sampleColorAtStagePos(pos.x, pos.y));
+            if (activeTool === 'eyedropper') {
+              const pos = e.target.getStage()?.getPointerPosition();
+              if (pos) {
+                setHoverColor(sampleColorAtStagePos(pos.x, pos.y));
+              }
+              return;
+            }
+            if (activeTool === 'magic-eraser') {
+              const pos = e.target.getStage()?.getPointerPosition();
+              if (pos) {
+                setEraserHoverPos({ x: pos.x, y: pos.y });
+              }
             }
           }}
         >
@@ -340,6 +490,21 @@ export const EditorCanvas: React.FC = () => {
             )}
           </KonvaLayer>
         </Stage>
+
+        {/* Circle Magic Eraser cursor preview */}
+        {activeTool === 'magic-eraser' &&
+          magicEraserMode === 'circle' &&
+          eraserHoverPos && (
+            <div
+              className="pointer-events-none absolute rounded-full border-2 border-cyan-400 bg-cyan-400/15 shadow-[0_0_0_1px_rgba(0,0,0,0.5)]"
+              style={{
+                width: magicEraserRadius * 2 * zoom,
+                height: magicEraserRadius * 2 * zoom,
+                left: eraserHoverPos.x - magicEraserRadius * zoom,
+                top: eraserHoverPos.y - magicEraserRadius * zoom,
+              }}
+            />
+          )}
 
         {/* Empty state hint */}
         {layers.length === 0 && (

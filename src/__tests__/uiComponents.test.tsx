@@ -307,4 +307,28 @@ describe('Editor UI Components', () => {
       expect(afterPick.adjustments?.backgroundRemoval?.enabled).toBe(true);
     }
   });
+
+  it('Magic Eraser toggles tool and switches between flood and circle modes', () => {
+    useEditorStore.getState().newCanvas(800, 600, null);
+    useEditorStore.getState().insertImages([
+      {
+        src: 'data:image/png;base64,test',
+        name: 'Photo',
+        width: 200,
+        height: 100,
+      },
+    ]);
+
+    render(<PropertiesPanel onOpenResizeModal={() => {}} />);
+    fireEvent.click(screen.getByText('Mở Magic Background Eraser'));
+    expect(useEditorStore.getState().activeTool).toBe('magic-eraser');
+
+    useEditorStore.getState().setMagicEraserMode('circle');
+    useEditorStore.getState().setMagicEraserRadius(45);
+    useEditorStore.getState().setMagicEraserTolerance(35);
+
+    expect(useEditorStore.getState().magicEraserMode).toBe('circle');
+    expect(useEditorStore.getState().magicEraserRadius).toBe(45);
+    expect(useEditorStore.getState().magicEraserTolerance).toBe(35);
+  });
 });

@@ -1,5 +1,5 @@
 import React, { useRef } from 'react';
-import { CloudFog, Crop, ImagePlus, MousePointer2 } from 'lucide-react';
+import { CloudFog, Crop, ImagePlus, MousePointer2, Wand2 } from 'lucide-react';
 import { useEditorStore } from '../../store/useEditorStore';
 import { readLocalImageFile } from '../../utils/fileHelpers';
 
@@ -40,6 +40,20 @@ export const LeftToolRail: React.FC = () => {
         }`}
       >
         <Crop className="w-4 h-4" />
+      </button>
+
+      <button
+        onClick={() =>
+          setActiveTool(activeTool === 'magic-eraser' ? 'select' : 'magic-eraser')
+        }
+        title="Magic Background Eraser (E)"
+        className={`w-9 h-9 rounded-lg flex items-center justify-center transition ${
+          activeTool === 'magic-eraser'
+            ? 'bg-cyan-600 text-white shadow'
+            : 'text-slate-400 hover:bg-slate-800 hover:text-cyan-300'
+        }`}
+      >
+        <Wand2 className="w-4 h-4" />
       </button>
 
       <div className="w-6 border-t border-slate-800 my-1" />
