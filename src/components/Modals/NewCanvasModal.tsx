@@ -10,6 +10,7 @@ interface NewCanvasModalProps {
 
 export const NewCanvasModal: React.FC<NewCanvasModalProps> = ({ open, onClose }) => {
   const newCanvas = useEditorStore((s) => s.newCanvas);
+  const [projectName, setProjectName] = useState('Untitled Project');
   const [width, setWidth] = useState(1920);
   const [height, setHeight] = useState(1080);
   const [transparent, setTransparent] = useState(true);
@@ -22,7 +23,7 @@ export const NewCanvasModal: React.FC<NewCanvasModalProps> = ({ open, onClose })
 
   const handleCreate = (e: React.FormEvent) => {
     e.preventDefault();
-    newCanvas(width, height, transparent ? null : bgColor);
+    newCanvas(width, height, transparent ? null : bgColor, projectName);
     onClose();
   };
 
@@ -30,13 +31,24 @@ export const NewCanvasModal: React.FC<NewCanvasModalProps> = ({ open, onClose })
     <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4">
       <div className="bg-[#181b22] border border-slate-700/80 rounded-xl shadow-2xl w-full max-w-lg overflow-hidden">
         <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-800">
-          <h2 className="text-sm font-semibold text-slate-100">Tạo ảnh mới (New Canvas)</h2>
+          <h2 className="text-sm font-semibold text-slate-100">Tạo Project mới (New Project)</h2>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-200">
             <X className="w-4 h-4" />
           </button>
         </div>
 
         <form onSubmit={handleCreate} className="p-5 space-y-4 text-xs">
+          <div>
+            <label className="block text-slate-400 mb-1">Tên Project</label>
+            <input
+              type="text"
+              value={projectName}
+              onChange={(e) => setProjectName(e.target.value)}
+              placeholder="Untitled Project"
+              className="w-full bg-[#0f1115] border border-slate-700 rounded-lg px-3 py-2 text-slate-100 focus:outline-none focus:border-blue-500"
+            />
+          </div>
+
           {/* Custom W x H */}
           <div className="grid grid-cols-2 gap-3">
             <div>

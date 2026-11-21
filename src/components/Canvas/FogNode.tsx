@@ -26,7 +26,6 @@ export const FogNode: React.FC<FogNodeProps> = ({
   nodeRef,
 }) => {
   const updateLayer = useEditorStore((s) => s.updateLayer);
-  const offscreenRef = useRef<HTMLCanvasElement | null>(null);
   const [renderedCanvas, setRenderedCanvas] = useState<HTMLCanvasElement | null>(null);
 
   useEffect(() => {
@@ -43,11 +42,8 @@ export const FogNode: React.FC<FogNodeProps> = ({
       }
       if (cancelled) return;
 
-      if (!offscreenRef.current) {
-        offscreenRef.current = document.createElement('canvas');
-      }
-      const out = renderFogToCanvas(layer, backdrop, offscreenRef.current);
-      // Trigger Konva redraw by updating state with a fresh reference or canvas
+      // Always create a fresh canvas so React & react-konva detect the new image reference immediately
+      const out = renderFogToCanvas(layer, backdrop);
       setRenderedCanvas(out);
     };
 

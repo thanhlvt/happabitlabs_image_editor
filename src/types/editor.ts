@@ -69,13 +69,15 @@ export interface ImageLayer extends BaseLayer {
   adjustments?: ImageAdjustments;
 }
 
+export type FadeEdge = 'bottom' | 'top' | 'left' | 'right';
+
 export interface FogLayer extends BaseLayer {
   type: 'fog';
   /** Gaussian blur radius in px (0 to 80) */
   blurRadius: number;
   /** Color overlay intensity (0.0 to 1.0) */
   colorIntensity: number;
-  gradientType: 'linear' | 'radial';
+  gradientType: 'linear' | 'radial' | 'smooth-fade';
   /** Angle in degrees (0 to 360) for linear gradient */
   angle: number;
   /** Spread / distance multiplier (0.1 to 2.0) for linear gradient */
@@ -88,6 +90,13 @@ export interface FogLayer extends BaseLayer {
   radialInnerRadius: number;
   /** Normalized outer radius (0.1 to 1.5) for radial gradient */
   radialOuterRadius: number;
+  /** Smooth Fade (BottomFade-style) properties */
+  fadeEdge?: FadeEdge;
+  fadeEdges?: FadeEdge[];
+  fadeOffset?: number;
+  fadeHeight?: number;
+  fadeColor?: string;
+  fadeAlpha?: number;
   /** Whether backdrop blur fades out following gradient stop alpha */
   blurFollowsAlpha: boolean;
   /** Corner radius in px */
@@ -110,6 +119,7 @@ export interface CropRect {
 
 export type EyedropperTarget =
   | { kind: 'fog-stop'; layerId: string; stopId: string }
+  | { kind: 'fog-fade'; layerId: string }
   | {
       kind: 'color-edit';
       layerId: string;
@@ -121,6 +131,14 @@ export interface EditorSnapshot {
   canvas: CanvasConfig;
   layers: Layer[];
   selectedLayerId: string | null;
+}
+
+export interface ProjectFile {
+  version: 1;
+  name: string;
+  savedAt: string;
+  canvas: CanvasConfig;
+  layers: Layer[];
 }
 
 export type ExportFormat = 'image/png' | 'image/jpeg' | 'image/webp';

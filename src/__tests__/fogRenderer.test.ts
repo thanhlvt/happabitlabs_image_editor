@@ -1,10 +1,13 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
+  computeSmoothFadeStops,
   createFogCanvasGradient,
+  getActiveFadeEdges,
   hexToRgb,
   hexToRgbaString,
   normalizeStops,
   rgbToHex,
+  smoothStep,
 } from '../utils/fogRenderer';
 import type { FogLayer } from '../types/editor';
 
@@ -87,5 +90,42 @@ describe('fogRenderer utilities', () => {
     expect(createRadialGradient).toHaveBeenCalledTimes(1);
     expect(addColorStop).toHaveBeenNthCalledWith(1, 0, 'rgba(255, 255, 255, 0)');
     expect(addColorStop).toHaveBeenNthCalledWith(2, 1, 'rgba(255, 255, 255, 0.8)');
+  });
+
+  it('computes SmoothStep curve and BottomFade 12-step stops accurately', () => {
+    expect(smoothStep(0, 1, 0)).toBe(0);
+    expect(smoothStep(0, 1, 0.25)).toBeCloseTo(0.15625, 5);
+    expect(smoothStep(0, 1, 0.5)).toBe(0.5);
+    expect(smoothStep(0, 1, 1)).toBe(1);
+
+    // Example from spec: span = 400, Bottom = 0, Height = 90 => start = 0, end = 0.225
+    const stops = computeSmoothFadeStops(400, 0, 90);
+    expect(stops[0]).toEqual({ level: 0, alpha: 0 });
+    // k = 0.25 (step 3 of 12): level = 0.05625, alpha = 0.15625
+    expect(stops[3].level).toBeCloseTo(0.05625, 5);
+    expect(stops[3].alpha).toBeCloseTo(0.15625, 5);
+    // k = 0.5 (step 6 of 12): level = 0.1125, alpha = 0.5
+    expect(stops[6].level).toBeCloseTo(0.1125, 5);
+    expect(stops[6].alpha).toBe(0.5);
+    // k = 1 (step 12 of 12): level = 0.225, alpha = 1
+    expect(stops[12].level).toBeCloseTo(0.225, 5);
+    expect(stops[12].alpha).toBe(1);
+    // Top of quad: level = 1, alpha = 1
+    expect(stops[stops.length - 1]).toEqual({ level: 1, alpha: 1 });
+
+    // When Bottom > 0, [0, start) is trimmed completely (alpha = 0)
+    const trimmed = computeSmoothFadeStops(400, 40, 80);
+    expect(trimmed[0]).toEqual({ level: 0, alpha: 0 });
+    expect(trimmed[1].alpha).toBe(0);
+    expect(trimmed[1].level).toBeCloseTo(0.1, 4);
+
+    // Multi-edge helper falls back gracefully and preserves multiple edges
+    expect(getActiveFadeEdges({ fadeEdges: ['bottom', 'top', 'left'] })).toEqual([
+      'bottom',
+      'top',
+      'left',
+    ]);
+    expect(getActiveFadeEdges({ fadeEdge: 'right' })).toEqual(['right']);
+    expect(getActiveFadeEdges({})).toEqual(['bottom']);
   });
 });

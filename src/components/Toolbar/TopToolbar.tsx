@@ -1,15 +1,21 @@
 import React, { useRef } from 'react';
 import {
+  CheckCircle2,
   Download,
   FilePlus2,
   FolderOpen,
   Redo2,
+  Save,
   Scaling,
   Sparkles,
   Undo2,
 } from 'lucide-react';
 import { useEditorStore } from '../../store/useEditorStore';
-import { readLocalImageFile } from '../../utils/fileHelpers';
+import {
+  downloadProjectFile,
+  parseProjectFile,
+  serializeProject,
+} from '../../utils/projectStorage';
 
 interface TopToolbarProps {
   onOpenNewModal: () => void;
@@ -22,20 +28,53 @@ export const TopToolbar: React.FC<TopToolbarProps> = ({
   onOpenResizeModal,
   onOpenExportModal,
 }) => {
-  const { canvas, past, future, undo, redo, openImageAsCanvas } = useEditorStore();
+  const {
+    projectName,
+    lastSavedAt,
+    canvas,
+    layers,
+    past,
+    future,
+    undo,
+    redo,
+    setProjectName,
+    setLastSavedAt,
+    loadProject,
+  } = useEditorStore();
   const openInputRef = useRef<HTMLInputElement | null>(null);
 
-  const handleOpenFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleOpenProject = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const img = await readLocalImageFile(file);
-    openImageAsCanvas(img);
+    try {
+      const text = await file.text();
+      const project = parseProjectFile(text);
+      loadProject(project);
+    } catch (err) {
+      window.alert(
+        err instanceof Error ? err.message : 'Không thể mở file project.'
+      );
+    }
     e.target.value = '';
   };
 
+  const handleSaveProject = () => {
+    const project = serializeProject(projectName, canvas, layers);
+    downloadProjectFile(project);
+    setLastSavedAt(project.savedAt);
+  };
+
+  const savedTimeText = lastSavedAt
+    ? new Date(lastSavedAt).toLocaleTimeString([], {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+      })
+    : null;
+
   return (
     <header className="h-12 bg-[#161920] border-b border-slate-800 px-3 flex items-center justify-between text-xs shrink-0">
-      {/* Left: Brand & File actions */}
+      {/* Left: Brand & Project actions */}
       <div className="flex items-center gap-1.5">
         <div className="flex items-center gap-2 pr-3 mr-1 border-r border-slate-800">
           <div className="w-6 h-6 rounded-md bg-gradient-to-br from-blue-500 to-cyan-400 flex items-center justify-center shadow">
@@ -48,6 +87,7 @@ export const TopToolbar: React.FC<TopToolbarProps> = ({
 
         <button
           onClick={onOpenNewModal}
+          title="Tạo Project mới"
           className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md hover:bg-slate-800 text-slate-200 transition"
         >
           <FilePlus2 className="w-3.5 h-3.5 text-blue-400" />
@@ -56,6 +96,7 @@ export const TopToolbar: React.FC<TopToolbarProps> = ({
 
         <button
           onClick={() => openInputRef.current?.click()}
+          title="Mở file Project (.mist.json)"
           className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md hover:bg-slate-800 text-slate-200 transition"
         >
           <FolderOpen className="w-3.5 h-3.5 text-amber-400" />
@@ -64,13 +105,23 @@ export const TopToolbar: React.FC<TopToolbarProps> = ({
         <input
           ref={openInputRef}
           type="file"
-          accept="image/*"
-          onChange={handleOpenFile}
+          accept=".mist.json,.json,application/json"
+          onChange={handleOpenProject}
           className="hidden"
         />
 
         <button
+          onClick={handleSaveProject}
+          title="Lưu Project về máy (Ctrl+S)"
+          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md hover:bg-slate-800 text-slate-200 transition"
+        >
+          <Save className="w-3.5 h-3.5 text-cyan-400" />
+          Save
+        </button>
+
+        <button
           onClick={onOpenResizeModal}
+          title="Đổi kích thước Canvas"
           className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md hover:bg-slate-800 text-slate-200 transition"
         >
           <Scaling className="w-3.5 h-3.5 text-emerald-400" />
@@ -78,8 +129,26 @@ export const TopToolbar: React.FC<TopToolbarProps> = ({
         </button>
       </div>
 
-      {/* Center: Undo/Redo & Dimensions */}
+      {/* Center: Project Name, Autosave status, Undo/Redo & Dimensions */}
       <div className="flex items-center gap-2">
+        <input
+          type="text"
+          aria-label="Tên Project"
+          value={projectName}
+          onChange={(e) => setProjectName(e.target.value)}
+          className="w-36 bg-[#0f1115] border border-slate-800 hover:border-slate-700 focus:border-blue-500 rounded-md px-2 py-1 text-slate-200 text-xs focus:outline-none truncate"
+        />
+
+        {savedTimeText && (
+          <span
+            title={`Tự động lưu lúc ${savedTimeText}`}
+            className="hidden md:flex items-center gap-1 text-[11px] text-emerald-400/90"
+          >
+            <CheckCircle2 className="w-3 h-3" />
+            Đã tự lưu
+          </span>
+        )}
+
         <div className="flex items-center gap-1 bg-[#0f1115] border border-slate-800 rounded-md p-0.5">
           <button
             onClick={undo}

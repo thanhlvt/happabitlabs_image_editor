@@ -3,6 +3,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { NewCanvasModal } from '../components/Modals/NewCanvasModal';
 import { LayerPanel } from '../components/Panels/LayerPanel';
 import { PropertiesPanel } from '../components/Panels/PropertiesPanel';
+import { TopToolbar } from '../components/Toolbar/TopToolbar';
 import { useEditorStore } from '../store/useEditorStore';
 
 describe('Editor UI Components', () => {
@@ -68,7 +69,7 @@ describe('Editor UI Components', () => {
     expect(useEditorStore.getState().layers[0].opacity).toBe(0.5);
   });
 
-  it('PropertiesPanel Fit width, Fit height, and Fit all buttons resize selected image', () => {
+  it('PropertiesPanel Fit width, Fit height, and Align buttons transform selected image', () => {
     useEditorStore.getState().newCanvas(1000, 800, null);
     useEditorStore.getState().insertImages([
       {
@@ -81,7 +82,9 @@ describe('Editor UI Components', () => {
 
     render(<PropertiesPanel onOpenResizeModal={() => {}} />);
 
-    fireEvent.click(screen.getByText('Fit width'));
+    expect(screen.queryByText('Fit all')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByLabelText('Fit width'));
     expect(useEditorStore.getState().layers[0]).toMatchObject({
       x: 0,
       y: 150,
@@ -89,7 +92,7 @@ describe('Editor UI Components', () => {
       height: 500,
     });
 
-    fireEvent.click(screen.getByText('Fit height'));
+    fireEvent.click(screen.getByLabelText('Fit height'));
     expect(useEditorStore.getState().layers[0]).toMatchObject({
       x: -300,
       y: 0,
@@ -97,13 +100,17 @@ describe('Editor UI Components', () => {
       height: 800,
     });
 
-    fireEvent.click(screen.getByText('Fit all'));
-    expect(useEditorStore.getState().layers[0]).toMatchObject({
-      x: 0,
-      y: 150,
-      width: 1000,
-      height: 500,
-    });
+    fireEvent.click(screen.getByLabelText('Align left'));
+    expect(useEditorStore.getState().layers[0].x).toBe(0);
+
+    fireEvent.click(screen.getByLabelText('Align right'));
+    expect(useEditorStore.getState().layers[0].x).toBe(-600);
+
+    fireEvent.click(screen.getByLabelText('Align top'));
+    expect(useEditorStore.getState().layers[0].y).toBe(0);
+
+    fireEvent.click(screen.getByLabelText('Align bottom'));
+    expect(useEditorStore.getState().layers[0].y).toBe(0);
   });
 
   it('ImageAdjustmentsPanel updates sliders, adds Color Edit rule, and resets', () => {
@@ -140,5 +147,58 @@ describe('Editor UI Components', () => {
       expect(afterReset.adjustments?.brightness).toBe(0);
       expect(afterReset.adjustments?.colorEdits).toHaveLength(0);
     }
+  });
+
+  it('FogControls supports Smooth Fade mode with Bottom offset and Height sliders', () => {
+    useEditorStore.getState().addFogLayer('white-mist');
+    render(<PropertiesPanel onOpenResizeModal={() => {}} />);
+
+    fireEvent.click(screen.getByText('Smooth Fade'));
+    expect(useEditorStore.getState().layers[0]).toMatchObject({
+      gradientType: 'smooth-fade',
+    });
+
+    fireEvent.change(screen.getByLabelText('Khoảng cắt hẳn (Bottom / Offset)'), {
+      target: { value: '25' },
+    });
+    fireEvent.change(screen.getByLabelText('Độ dài vùng mờ SmoothStep (Height)'), {
+      target: { value: '120' },
+    });
+
+    expect(useEditorStore.getState().layers[0]).toMatchObject({
+      fadeOffset: 25,
+      fadeHeight: 120,
+    });
+
+    // Multi-edge toggle: add Top and Left while keeping Bottom active
+    fireEvent.click(screen.getByText('Trên ↓'));
+    fireEvent.click(screen.getByText('Trái →'));
+    expect(useEditorStore.getState().layers[0]).toMatchObject({
+      fadeEdges: ['bottom', 'top', 'left'],
+    });
+
+    // Toggle Bottom off
+    fireEvent.click(screen.getByText('Dưới ↑'));
+    expect(useEditorStore.getState().layers[0]).toMatchObject({
+      fadeEdges: ['top', 'left'],
+    });
+  });
+
+  it('TopToolbar renders New, Open, Save buttons and editable Project Name', () => {
+    render(
+      <TopToolbar
+        onOpenNewModal={() => {}}
+        onOpenResizeModal={() => {}}
+        onOpenExportModal={() => {}}
+      />
+    );
+
+    expect(screen.getByText('New')).toBeInTheDocument();
+    expect(screen.getByText('Open')).toBeInTheDocument();
+    expect(screen.getByText('Save')).toBeInTheDocument();
+
+    const nameInput = screen.getByLabelText('Tên Project');
+    fireEvent.change(nameInput, { target: { value: 'Game Banner 01' } });
+    expect(useEditorStore.getState().projectName).toBe('Game Banner 01');
   });
 });

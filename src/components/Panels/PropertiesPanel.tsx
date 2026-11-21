@@ -1,5 +1,18 @@
 import React from 'react';
-import { AlignCenter, Crop, Lock, Maximize, Scaling, Unlock } from 'lucide-react';
+import {
+  AlignCenter,
+  AlignHorizontalJustifyEnd,
+  AlignHorizontalJustifyStart,
+  AlignVerticalJustifyEnd,
+  AlignVerticalJustifyStart,
+  Crop,
+  Lock,
+  Maximize,
+  MoveHorizontal,
+  MoveVertical,
+  Scaling,
+  Unlock,
+} from 'lucide-react';
 import { useEditorStore } from '../../store/useEditorStore';
 import { computeAspectDimensions, computeLayerFit } from '../../utils/geometry';
 import { FogControls } from './FogControls';
@@ -280,30 +293,77 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
           </button>
         </div>
 
-        <div className="grid grid-cols-3 gap-1.5 pt-0.5">
-          {(
-            [
-              { mode: 'width', label: 'Fit width', title: 'Resize vừa chiều rộng canvas' },
-              { mode: 'height', label: 'Fit height', title: 'Resize vừa chiều cao canvas' },
-              { mode: 'all', label: 'Fit all', title: 'Resize vừa khít toàn bộ trong canvas' },
-            ] as const
-          ).map((btn) => (
-            <button
-              key={btn.mode}
-              type="button"
-              title={btn.title}
-              onClick={() =>
-                updateLayer(
-                  layer.id,
-                  computeLayerFit(layer, canvas.width, canvas.height, btn.mode),
-                  true
-                )
-              }
-              className="py-1 px-2 rounded bg-[#0f1115] border border-slate-800 hover:border-blue-500/60 hover:text-blue-300 text-slate-300 text-[11px] transition"
-            >
-              {btn.label}
-            </button>
-          ))}
+        <div className="grid grid-cols-6 gap-1 pt-0.5">
+          <button
+            type="button"
+            aria-label="Align left"
+            title="Căn trái (Align left)"
+            onClick={() => updateLayer(layer.id, { x: 0 }, true)}
+            className="flex items-center justify-center py-1.5 rounded bg-[#0f1115] border border-slate-800 hover:border-blue-500/60 hover:text-blue-300 text-slate-300 transition"
+          >
+            <AlignHorizontalJustifyStart className="w-3.5 h-3.5" />
+          </button>
+          <button
+            type="button"
+            aria-label="Align right"
+            title="Căn phải (Align right)"
+            onClick={() =>
+              updateLayer(layer.id, { x: Math.round(canvas.width - layer.width) }, true)
+            }
+            className="flex items-center justify-center py-1.5 rounded bg-[#0f1115] border border-slate-800 hover:border-blue-500/60 hover:text-blue-300 text-slate-300 transition"
+          >
+            <AlignHorizontalJustifyEnd className="w-3.5 h-3.5" />
+          </button>
+          <button
+            type="button"
+            aria-label="Align top"
+            title="Căn trên (Align top)"
+            onClick={() => updateLayer(layer.id, { y: 0 }, true)}
+            className="flex items-center justify-center py-1.5 rounded bg-[#0f1115] border border-slate-800 hover:border-blue-500/60 hover:text-blue-300 text-slate-300 transition"
+          >
+            <AlignVerticalJustifyStart className="w-3.5 h-3.5" />
+          </button>
+          <button
+            type="button"
+            aria-label="Align bottom"
+            title="Căn dưới (Align bottom)"
+            onClick={() =>
+              updateLayer(layer.id, { y: Math.round(canvas.height - layer.height) }, true)
+            }
+            className="flex items-center justify-center py-1.5 rounded bg-[#0f1115] border border-slate-800 hover:border-blue-500/60 hover:text-blue-300 text-slate-300 transition"
+          >
+            <AlignVerticalJustifyEnd className="w-3.5 h-3.5" />
+          </button>
+          <button
+            type="button"
+            aria-label="Fit width"
+            title="Fit width (Resize vừa chiều rộng canvas)"
+            onClick={() =>
+              updateLayer(
+                layer.id,
+                computeLayerFit(layer, canvas.width, canvas.height, 'width'),
+                true
+              )
+            }
+            className="flex items-center justify-center py-1.5 rounded bg-[#0f1115] border border-slate-800 hover:border-cyan-500/60 hover:text-cyan-300 text-slate-300 transition"
+          >
+            <MoveHorizontal className="w-3.5 h-3.5" />
+          </button>
+          <button
+            type="button"
+            aria-label="Fit height"
+            title="Fit height (Resize vừa chiều cao canvas)"
+            onClick={() =>
+              updateLayer(
+                layer.id,
+                computeLayerFit(layer, canvas.width, canvas.height, 'height'),
+                true
+              )
+            }
+            className="flex items-center justify-center py-1.5 rounded bg-[#0f1115] border border-slate-800 hover:border-cyan-500/60 hover:text-cyan-300 text-slate-300 transition"
+          >
+            <MoveVertical className="w-3.5 h-3.5" />
+          </button>
         </div>
       </div>
 

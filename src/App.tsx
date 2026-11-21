@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { TopToolbar } from './components/Toolbar/TopToolbar';
 import { LeftToolRail } from './components/Toolbar/LeftToolRail';
 import { EditorCanvas } from './components/Canvas/EditorCanvas';
@@ -8,13 +8,23 @@ import { NewCanvasModal } from './components/Modals/NewCanvasModal';
 import { ResizeModal } from './components/Modals/ResizeModal';
 import { ExportModal } from './components/Modals/ExportModal';
 import { useEditorStore } from './store/useEditorStore';
+import {
+  downloadProjectFile,
+  loadAutoSaveProject,
+  saveAutoSaveProject,
+  serializeProject,
+} from './utils/projectStorage';
 
 export function App() {
   const [newModalOpen, setNewModalOpen] = useState(false);
   const [resizeModalOpen, setResizeModalOpen] = useState(false);
   const [exportModalOpen, setExportModalOpen] = useState(false);
+  const hydratedRef = useRef(false);
 
   const {
+    projectName,
+    canvas,
+    layers,
     undo,
     redo,
     setActiveTool,
@@ -25,7 +35,37 @@ export function App() {
     deleteLayer,
     duplicateLayer,
     updateLayer,
+    loadProject,
+    setLastSavedAt,
   } = useEditorStore();
+
+  // Restore last autosaved project from IndexedDB on mount
+  useEffect(() => {
+    let active = true;
+    loadAutoSaveProject().then((saved) => {
+      if (!active) return;
+      if (saved) {
+        loadProject(saved);
+      }
+      hydratedRef.current = true;
+    });
+    return () => {
+      active = false;
+    };
+  }, [loadProject]);
+
+  // Auto-save to IndexedDB whenever projectName, canvas, or layers change
+  useEffect(() => {
+    if (!hydratedRef.current) return;
+    const timer = window.setTimeout(async () => {
+      const project = serializeProject(projectName, canvas, layers);
+      const ok = await saveAutoSaveProject(project);
+      if (ok) {
+        setLastSavedAt(project.savedAt);
+      }
+    }, 500);
+    return () => window.clearTimeout(timer);
+  }, [projectName, canvas, layers, setLastSavedAt]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -37,6 +77,18 @@ export function App() {
       if (isInput) return;
 
       const state = useEditorStore.getState();
+
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+        e.preventDefault();
+        const project = serializeProject(
+          state.projectName,
+          state.canvas,
+          state.layers
+        );
+        downloadProjectFile(project);
+        state.setLastSavedAt(project.savedAt);
+        return;
+      }
 
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
         e.preventDefault();

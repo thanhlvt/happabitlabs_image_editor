@@ -11,6 +11,7 @@ import type {
   ImageAdjustments,
   ImageLayer,
   Layer,
+  ProjectFile,
   ToolType,
 } from '../types/editor';
 import { createDefaultImageAdjustments } from '../utils/imageFilters';
@@ -56,6 +57,8 @@ function cloneSnapshot(
 }
 
 export interface EditorState {
+  projectName: string;
+  lastSavedAt: string | null;
   canvas: CanvasConfig;
   layers: Layer[];
   selectedLayerId: string | null;
@@ -74,8 +77,16 @@ export interface EditorState {
   undo: () => void;
   redo: () => void;
 
-  // Canvas & file actions
-  newCanvas: (width: number, height: number, backgroundColor: string | null) => void;
+  // Project & Canvas actions
+  setProjectName: (name: string) => void;
+  setLastSavedAt: (iso: string | null) => void;
+  loadProject: (project: ProjectFile) => void;
+  newCanvas: (
+    width: number,
+    height: number,
+    backgroundColor: string | null,
+    projectName?: string
+  ) => void;
   setCanvasBackground: (backgroundColor: string | null) => void;
   openImageAsCanvas: (img: LoadedImageData) => void;
   insertImages: (imgs: LoadedImageData[]) => void;
@@ -124,6 +135,7 @@ export interface EditorState {
   setZoom: (zoom: number) => void;
   setAlphaPreviewMode: (mode: AlphaPreviewMode) => void;
   startEyedropper: (layerId: string, stopId: string) => void;
+  startFogFadeEyedropper: (layerId: string) => void;
   startColorEditEyedropper: (
     layerId: string,
     ruleId: string,
@@ -140,6 +152,8 @@ const DEFAULT_CANVAS: CanvasConfig = {
 };
 
 export const useEditorStore = create<EditorState>((set, get) => ({
+  projectName: 'Untitled Project',
+  lastSavedAt: null,
   canvas: DEFAULT_CANVAS,
   layers: [],
   selectedLayerId: null,
@@ -193,9 +207,29 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     });
   },
 
-  newCanvas: (width, height, backgroundColor) => {
-    get().pushHistory();
+  setProjectName: (name) => set({ projectName: name }),
+
+  setLastSavedAt: (iso) => set({ lastSavedAt: iso }),
+
+  loadProject: (project) => {
     set({
+      projectName: project.name || 'Untitled Project',
+      lastSavedAt: project.savedAt ?? null,
+      canvas: { ...project.canvas },
+      layers: project.layers,
+      selectedLayerId: project.layers[project.layers.length - 1]?.id ?? null,
+      activeTool: 'select',
+      cropRect: null,
+      eyedropperTarget: null,
+      past: [],
+      future: [],
+    });
+  },
+
+  newCanvas: (width, height, backgroundColor, projectName) => {
+    get().pushHistory();
+    set((state) => ({
+      projectName: projectName?.trim() || state.projectName || 'Untitled Project',
       canvas: {
         width: Math.max(1, Math.round(width)),
         height: Math.max(1, Math.round(height)),
@@ -206,7 +240,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       activeTool: 'select',
       cropRect: null,
       eyedropperTarget: null,
-    });
+    }));
   },
 
   setCanvasBackground: (backgroundColor) => {
@@ -387,6 +421,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       radialCenterY: preset.config.radialCenterY ?? 0.5,
       radialInnerRadius: preset.config.radialInnerRadius ?? 0.2,
       radialOuterRadius: preset.config.radialOuterRadius ?? 0.95,
+      fadeEdge: 'bottom',
+      fadeEdges: ['bottom'],
+      fadeOffset: 0,
+      fadeHeight: 90,
+      fadeColor: '#ffffff',
+      fadeAlpha: 1,
       blurFollowsAlpha: preset.config.blurFollowsAlpha ?? true,
       borderRadius: preset.config.borderRadius ?? 0,
       stops: preset.config.stops.map((s) => ({
@@ -659,6 +699,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       eyedropperTarget: { kind: 'fog-stop', layerId, stopId },
     }),
 
+  startFogFadeEyedropper: (layerId) =>
+    set({
+      activeTool: 'eyedropper',
+      eyedropperTarget: { kind: 'fog-fade', layerId },
+    }),
+
   startColorEditEyedropper: (layerId, ruleId, field) =>
     set({
       activeTool: 'eyedropper',
@@ -675,6 +721,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         { color: hex },
         true
       );
+    } else if (eyedropperTarget.kind === 'fog-fade') {
+      get().updateLayer(eyedropperTarget.layerId, { fadeColor: hex }, true);
     } else {
       get().updateColorEditRule(
         eyedropperTarget.layerId,

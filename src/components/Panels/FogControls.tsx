@@ -4,7 +4,12 @@ import { Pipette, Plus, Trash2 } from 'lucide-react';
 import type { FogLayer } from '../../types/editor';
 import { useEditorStore } from '../../store/useEditorStore';
 import { FOG_PRESETS } from '../../utils/fogPresets';
-import { hexToRgbaString, normalizeStops } from '../../utils/fogRenderer';
+import {
+  computeSmoothFadeStops,
+  getActiveFadeEdges,
+  hexToRgbaString,
+  normalizeStops,
+} from '../../utils/fogRenderer';
 
 interface FogControlsProps {
   layer: FogLayer;
@@ -21,6 +26,7 @@ export const FogControls: React.FC<FogControlsProps> = ({ layer }) => {
     removeFogStop,
     applyFogPreset,
     startEyedropper,
+    startFogFadeEyedropper,
     pushHistory,
   } = useEditorStore();
 
@@ -185,24 +191,261 @@ export const FogControls: React.FC<FogControlsProps> = ({ layer }) => {
         <div className="flex items-center justify-between">
           <span className="text-slate-400 font-medium">Kiểu Gradient</span>
           <div className="flex bg-[#0f1115] rounded-md p-0.5 border border-slate-800">
-            {(['linear', 'radial'] as const).map((t) => (
+            {(
+              [
+                { id: 'linear', label: 'Linear' },
+                { id: 'radial', label: 'Radial' },
+                { id: 'smooth-fade', label: 'Smooth Fade' },
+              ] as const
+            ).map((t) => (
               <button
-                key={t}
+                key={t.id}
                 type="button"
-                onClick={() => updateLayer(layer.id, { gradientType: t }, true)}
-                className={`px-2.5 py-0.5 rounded capitalize ${
-                  layer.gradientType === t
+                onClick={() => updateLayer(layer.id, { gradientType: t.id }, true)}
+                className={`px-2 py-0.5 rounded text-[11px] ${
+                  layer.gradientType === t.id
                     ? 'bg-blue-600 text-white'
                     : 'text-slate-400 hover:text-slate-200'
                 }`}
               >
-                {t}
+                {t.label}
               </button>
             ))}
           </div>
         </div>
 
-        {layer.gradientType === 'linear' ? (
+        {layer.gradientType === 'smooth-fade' ? (
+          (() => {
+            const activeEdges = getActiveFadeEdges(layer);
+            const hasVertical =
+              activeEdges.includes('bottom') || activeEdges.includes('top');
+            const hasHorizontal =
+              activeEdges.includes('left') || activeEdges.includes('right');
+            const span =
+              hasVertical && hasHorizontal
+                ? Math.max(layer.width, layer.height)
+                : hasHorizontal
+                ? layer.width
+                : layer.height;
+
+            const fadeOffset = layer.fadeOffset ?? 0;
+            const fadeHeight = layer.fadeHeight ?? 90;
+            const fadeColor = layer.fadeColor ?? '#ffffff';
+            const fadeAlpha = layer.fadeAlpha ?? 1;
+            const fadeStops = computeSmoothFadeStops(span, fadeOffset, fadeHeight);
+            const previewCss = `linear-gradient(90deg, ${fadeStops
+              .map(
+                (st) =>
+                  `${hexToRgbaString(fadeColor, st.alpha * fadeAlpha)} ${Math.round(
+                    st.level * 100
+                  )}%`
+              )
+              .join(', ')})`;
+
+            const toggleEdge = (edgeId: 'bottom' | 'top' | 'left' | 'right') => {
+              const exists = activeEdges.includes(edgeId);
+              const nextEdges = exists
+                ? activeEdges.filter((e) => e !== edgeId)
+                : [...activeEdges, edgeId];
+              updateLayer(layer.id, { fadeEdges: nextEdges }, true);
+            };
+
+            return (
+              <div className="space-y-2.5 bg-[#0f1115] border border-slate-800 rounded-lg p-2.5">
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-[11px] text-slate-400">
+                      Chọn cạnh mờ (chọn nhiều)
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        updateLayer(
+                          layer.id,
+                          {
+                            fadeEdges:
+                              activeEdges.length === 4
+                                ? ['bottom']
+                                : ['bottom', 'top', 'left', 'right'],
+                          },
+                          true
+                        )
+                      }
+                      className="text-[10px] text-blue-400 hover:text-blue-300"
+                    >
+                      {activeEdges.length === 4 ? 'Chỉ Dưới' : 'Chọn cả 4'}
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-4 gap-1">
+                    {(
+                      [
+                        { id: 'bottom', label: 'Dưới ↑' },
+                        { id: 'top', label: 'Trên ↓' },
+                        { id: 'left', label: 'Trái →' },
+                        { id: 'right', label: 'Phải ←' },
+                      ] as const
+                    ).map((e) => {
+                      const isActive = activeEdges.includes(e.id);
+                      return (
+                        <button
+                          key={e.id}
+                          type="button"
+                          aria-pressed={isActive}
+                          onClick={() => toggleEdge(e.id)}
+                          className={`py-1 rounded border text-[10px] transition ${
+                            isActive
+                              ? 'bg-blue-600/25 border-blue-500 text-blue-200 font-medium'
+                              : 'bg-[#181b22] border-slate-800 text-slate-400 hover:text-slate-200'
+                          }`}
+                        >
+                          {e.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Preview bar */}
+                <div className="h-4 rounded border border-slate-700 checker-sm overflow-hidden">
+                  <div className="w-full h-full" style={{ background: previewCss }} />
+                </div>
+
+                <div>
+                  <div className="flex justify-between text-slate-300 mb-0.5">
+                    <span>Khoảng cắt hẳn (Bottom / Offset)</span>
+                    <span className="font-mono text-slate-400">{fadeOffset} px</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="range"
+                      aria-label="Khoảng cắt hẳn (Bottom / Offset)"
+                      min={0}
+                      max={Math.max(10, Math.round(span))}
+                      value={fadeOffset}
+                      onPointerDown={pushHistory}
+                      onChange={(e) =>
+                        updateLayer(
+                          layer.id,
+                          { fadeOffset: Number(e.target.value) },
+                          false
+                        )
+                      }
+                      className="flex-1 accent-blue-500"
+                    />
+                    <input
+                      type="number"
+                      min={0}
+                      max={Math.max(10, Math.round(span))}
+                      value={fadeOffset}
+                      onChange={(e) =>
+                        updateLayer(
+                          layer.id,
+                          { fadeOffset: Math.max(0, Number(e.target.value) || 0) },
+                          true
+                        )
+                      }
+                      className="w-14 bg-[#181b22] border border-slate-700 rounded px-1.5 py-0.5 font-mono text-slate-100"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <div className="flex justify-between text-slate-300 mb-0.5">
+                    <span>Độ dài vùng mờ SmoothStep (Height)</span>
+                    <span className="font-mono text-slate-400">{fadeHeight} px</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="range"
+                      aria-label="Độ dài vùng mờ SmoothStep (Height)"
+                      min={0}
+                      max={Math.max(10, Math.round(span))}
+                      value={fadeHeight}
+                      onPointerDown={pushHistory}
+                      onChange={(e) =>
+                        updateLayer(
+                          layer.id,
+                          { fadeHeight: Number(e.target.value) },
+                          false
+                        )
+                      }
+                      className="flex-1 accent-cyan-400"
+                    />
+                    <input
+                      type="number"
+                      min={0}
+                      max={Math.max(10, Math.round(span))}
+                      value={fadeHeight}
+                      onChange={(e) =>
+                        updateLayer(
+                          layer.id,
+                          { fadeHeight: Math.max(0, Number(e.target.value) || 0) },
+                          true
+                        )
+                      }
+                      className="w-14 bg-[#181b22] border border-slate-700 rounded px-1.5 py-0.5 font-mono text-slate-100"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 pt-1">
+                  <input
+                    type="text"
+                    value={fadeColor}
+                    onChange={(e) =>
+                      updateLayer(layer.id, { fadeColor: e.target.value }, true)
+                    }
+                    className="w-24 bg-[#181b22] border border-slate-700 rounded px-2 py-1 font-mono text-slate-100 uppercase"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => startFogFadeEyedropper(layer.id)}
+                    title="Hút màu trực tiếp từ ảnh"
+                    className="flex items-center gap-1 px-2 py-1 rounded bg-slate-800 hover:bg-blue-600 text-slate-200 transition"
+                  >
+                    <Pipette className="w-3.5 h-3.5" />
+                    <span>Hút màu</span>
+                  </button>
+                </div>
+
+                <div onPointerDown={pushHistory}>
+                  <HexColorPicker
+                    color={fadeColor}
+                    onChange={(color) =>
+                      updateLayer(layer.id, { fadeColor: color }, false)
+                    }
+                    style={{ width: '100%', height: '96px' }}
+                  />
+                </div>
+
+                <div>
+                  <div className="flex justify-between text-slate-300 mb-0.5">
+                    <span>Alpha vùng đục</span>
+                    <span className="font-mono text-slate-400">
+                      {Math.round(fadeAlpha * 100)}%
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min={0}
+                    max={1}
+                    step={0.01}
+                    value={fadeAlpha}
+                    onPointerDown={pushHistory}
+                    onChange={(e) =>
+                      updateLayer(
+                        layer.id,
+                        { fadeAlpha: Number(e.target.value) },
+                        false
+                      )
+                    }
+                    className="w-full accent-cyan-400"
+                  />
+                </div>
+              </div>
+            );
+          })()
+        ) : layer.gradientType === 'linear' ? (
           <>
             <div>
               <div className="flex justify-between text-slate-300 mb-1">
@@ -343,8 +586,9 @@ export const FogControls: React.FC<FogControlsProps> = ({ layer }) => {
         )}
       </div>
 
-      {/* Gradient Stops + Color Picker + Eyedropper */}
-      <div className="space-y-2.5 pt-2 border-t border-slate-800/80">
+      {/* Gradient Stops + Color Picker + Eyedropper (for Linear & Radial) */}
+      {layer.gradientType !== 'smooth-fade' && (
+        <div className="space-y-2.5 pt-2 border-t border-slate-800/80">
         <div className="flex items-center justify-between">
           <span className="text-slate-400 font-medium">Điểm màu & Alpha Gradient</span>
           <button
@@ -482,7 +726,8 @@ export const FogControls: React.FC<FogControlsProps> = ({ layer }) => {
             </div>
           </div>
         )}
-      </div>
+        </div>
+      )}
 
       {/* Border Radius */}
       <div>
