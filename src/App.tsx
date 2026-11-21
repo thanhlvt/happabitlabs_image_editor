@@ -4,6 +4,7 @@ import { LeftToolRail } from './components/Toolbar/LeftToolRail';
 import { EditorCanvas } from './components/Canvas/EditorCanvas';
 import { WorkspacePanels } from './components/Panels/WorkspacePanels';
 import { NewCanvasModal } from './components/Modals/NewCanvasModal';
+import { OpenProjectModal } from './components/Modals/OpenProjectModal';
 import { ResizeModal } from './components/Modals/ResizeModal';
 import { ExportModal } from './components/Modals/ExportModal';
 import { useEditorStore } from './store/useEditorStore';
@@ -17,11 +18,13 @@ import { copySelectionFromImageLayer } from './utils/selectionUtils';
 
 export function App() {
   const [newModalOpen, setNewModalOpen] = useState(false);
+  const [openProjectsModalOpen, setOpenProjectsModalOpen] = useState(false);
   const [resizeModalOpen, setResizeModalOpen] = useState(false);
   const [exportModalOpen, setExportModalOpen] = useState(false);
   const hydratedRef = useRef(false);
 
   const {
+    projectId,
     projectName,
     lastExportName,
     canvas,
@@ -67,13 +70,19 @@ export function App() {
   useEffect(() => {
     if (!hydratedRef.current) return;
     const timer = window.setTimeout(async () => {
-      const project = serializeProject(projectName, canvas, layers, {
-        panelLayout,
-        zoom,
-        alphaPreviewMode,
-        selectedLayerId,
-        lastExportName,
-      });
+      const project = serializeProject(
+        projectName,
+        canvas,
+        layers,
+        {
+          panelLayout,
+          zoom,
+          alphaPreviewMode,
+          selectedLayerId,
+          lastExportName,
+        },
+        projectId
+      );
       const ok = await saveAutoSaveProject(project);
       if (ok) {
         setLastSavedAt(project.savedAt);
@@ -81,6 +90,7 @@ export function App() {
     }, 500);
     return () => window.clearTimeout(timer);
   }, [
+    projectId,
     projectName,
     canvas,
     layers,
@@ -115,7 +125,8 @@ export function App() {
             alphaPreviewMode: state.alphaPreviewMode,
             selectedLayerId: state.selectedLayerId,
             lastExportName: state.lastExportName,
-          }
+          },
+          state.projectId
         );
         downloadProjectFile(project);
         state.setLastSavedAt(project.savedAt);
@@ -255,6 +266,7 @@ export function App() {
     <div className="h-screen w-screen flex flex-col bg-[#0f1115] text-slate-100 overflow-hidden">
       <TopToolbar
         onOpenNewModal={() => setNewModalOpen(true)}
+        onOpenProjectsModal={() => setOpenProjectsModalOpen(true)}
         onOpenResizeModal={() => setResizeModalOpen(true)}
         onOpenExportModal={() => setExportModalOpen(true)}
       />
@@ -268,6 +280,10 @@ export function App() {
       </div>
 
       <NewCanvasModal open={newModalOpen} onClose={() => setNewModalOpen(false)} />
+      <OpenProjectModal
+        open={openProjectsModalOpen}
+        onClose={() => setOpenProjectsModalOpen(false)}
+      />
       <ResizeModal
         open={resizeModalOpen}
         onClose={() => setResizeModalOpen(false)}

@@ -3,6 +3,7 @@ import {
   CheckCircle2,
   Download,
   FilePlus2,
+  FolderInput,
   FolderOpen,
   Redo2,
   Save,
@@ -14,21 +15,25 @@ import { useEditorStore } from '../../store/useEditorStore';
 import {
   downloadProjectFile,
   parseProjectFile,
+  saveAutoSaveProject,
   serializeProject,
 } from '../../utils/projectStorage';
 
 interface TopToolbarProps {
   onOpenNewModal: () => void;
+  onOpenProjectsModal: () => void;
   onOpenResizeModal: () => void;
   onOpenExportModal: () => void;
 }
 
 export const TopToolbar: React.FC<TopToolbarProps> = ({
   onOpenNewModal,
+  onOpenProjectsModal,
   onOpenResizeModal,
   onOpenExportModal,
 }) => {
   const {
+    projectId,
     projectName,
     lastSavedAt,
     lastExportName,
@@ -46,47 +51,54 @@ export const TopToolbar: React.FC<TopToolbarProps> = ({
     setLastSavedAt,
     loadProject,
   } = useEditorStore();
-  const openInputRef = useRef<HTMLInputElement | null>(null);
+  const importInputRef = useRef<HTMLInputElement | null>(null);
 
-  const handleOpenProject = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImportProject = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     try {
       const text = await file.text();
       const project = parseProjectFile(text);
       loadProject(project);
+      await saveAutoSaveProject(project);
     } catch (err) {
       window.alert(
-        err instanceof Error ? err.message : 'Không thể mở file project.'
+        err instanceof Error ? err.message : 'Không thể import file project.'
       );
     }
     e.target.value = '';
   };
 
-  const handleSaveProject = () => {
-    const project = serializeProject(projectName, canvas, layers, {
-      panelLayout,
-      zoom,
-      alphaPreviewMode,
-      selectedLayerId,
-      lastExportName,
-    });
+  const handleSaveProjectToDisc = () => {
+    const project = serializeProject(
+      projectName,
+      canvas,
+      layers,
+      {
+        panelLayout,
+        zoom,
+        alphaPreviewMode,
+        selectedLayerId,
+        lastExportName,
+      },
+      projectId
+    );
     downloadProjectFile(project);
     setLastSavedAt(project.savedAt);
   };
 
   const savedTimeText = lastSavedAt
     ? new Date(lastSavedAt).toLocaleTimeString([], {
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-    })
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+      })
     : null;
 
   return (
     <header className="h-12 bg-[#161920] border-b border-slate-800 px-3 flex items-center justify-between text-xs shrink-0">
-      {/* Left: Brand & Project actions */}
-      <div className="flex items-center gap-1.5">
+      {/* Left: Brand & Project actions (Icon + Tooltip) */}
+      <div className="flex items-center gap-1">
         <div className="flex items-center gap-2 pr-3 mr-1 border-r border-slate-800">
           <div className="w-6 h-6 rounded-md bg-gradient-to-br from-blue-500 to-cyan-400 flex items-center justify-center shadow">
             <Sparkles className="w-3.5 h-3.5 text-white" />
@@ -97,46 +109,60 @@ export const TopToolbar: React.FC<TopToolbarProps> = ({
         </div>
 
         <button
+          type="button"
           onClick={onOpenNewModal}
-          title="Tạo Project mới"
-          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md hover:bg-slate-800 text-slate-200 transition"
+          aria-label="New Project"
+          title="New Project"
+          className="p-2 rounded-md hover:bg-slate-800 text-blue-400 transition"
         >
-          <FilePlus2 className="w-3.5 h-3.5 text-blue-400" />
-          New
+          <FilePlus2 className="w-4 h-4" />
         </button>
 
         <button
-          onClick={() => openInputRef.current?.click()}
-          title="Mở file Project (.mist.json)"
-          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md hover:bg-slate-800 text-slate-200 transition"
+          type="button"
+          onClick={onOpenProjectsModal}
+          aria-label="Open Project"
+          title="Open Project (chọn từ IndexedDB)"
+          className="p-2 rounded-md hover:bg-slate-800 text-amber-400 transition"
         >
-          <FolderOpen className="w-3.5 h-3.5 text-amber-400" />
-          Open
+          <FolderOpen className="w-4 h-4" />
+        </button>
+
+        <button
+          type="button"
+          onClick={() => importInputRef.current?.click()}
+          aria-label="Import Project"
+          title="Import Project (.mist.json)"
+          className="p-2 rounded-md hover:bg-slate-800 text-violet-400 transition"
+        >
+          <FolderInput className="w-4 h-4" />
         </button>
         <input
-          ref={openInputRef}
+          ref={importInputRef}
           type="file"
           accept=".mist.json,.json,application/json"
-          onChange={handleOpenProject}
+          onChange={handleImportProject}
           className="hidden"
         />
 
         <button
-          onClick={handleSaveProject}
-          title="Lưu Project về máy (Ctrl+S)"
-          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md hover:bg-slate-800 text-slate-200 transition"
+          type="button"
+          onClick={handleSaveProjectToDisc}
+          aria-label="Save Project To Disc"
+          title="Save Project To Disc (Ctrl+S)"
+          className="p-2 rounded-md hover:bg-slate-800 text-cyan-400 transition"
         >
-          <Save className="w-3.5 h-3.5 text-cyan-400" />
-          Save
+          <Save className="w-4 h-4" />
         </button>
 
         <button
+          type="button"
           onClick={onOpenResizeModal}
-          title="Đổi kích thước Canvas"
-          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md hover:bg-slate-800 text-slate-200 transition"
+          aria-label="Resize"
+          title="Resize Canvas"
+          className="p-2 rounded-md hover:bg-slate-800 text-emerald-400 transition"
         >
-          <Scaling className="w-3.5 h-3.5 text-emerald-400" />
-          Resize
+          <Scaling className="w-4 h-4" />
         </button>
       </div>
 

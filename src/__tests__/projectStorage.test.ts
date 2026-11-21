@@ -110,4 +110,21 @@ describe('projectStorage', () => {
     expect(state.alphaPreviewMode).toBe('checker-light');
     expect(state.lastExportName).toBe('hero-banner-v3');
   });
+
+  it('assigns unique projectId on newCanvas and preserves project id in serializeProject/parseProjectFile', () => {
+    const firstId = useEditorStore.getState().projectId;
+    useEditorStore.getState().newCanvas(800, 600, null, 'Second Project');
+    const secondId = useEditorStore.getState().projectId;
+    expect(secondId).not.toBe(firstId);
+
+    const serialized = serializeProject(
+      'Second Project',
+      { width: 800, height: 600, backgroundColor: null },
+      [],
+      undefined,
+      secondId
+    );
+    const parsed = parseProjectFile(JSON.stringify(serialized));
+    expect(parsed.id).toBe(secondId);
+  });
 });

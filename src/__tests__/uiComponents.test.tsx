@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { NewCanvasModal } from '../components/Modals/NewCanvasModal';
+import { OpenProjectModal } from '../components/Modals/OpenProjectModal';
 import { ExportModal } from '../components/Modals/ExportModal';
 import { LayerPanel } from '../components/Panels/LayerPanel';
 import { PropertiesPanel } from '../components/Panels/PropertiesPanel';
@@ -199,22 +200,32 @@ describe('Editor UI Components', () => {
     });
   });
 
-  it('TopToolbar renders New, Open, Save buttons and editable Project Name', () => {
+  it('TopToolbar renders icon buttons with tooltips and editable Project Name', () => {
     render(
       <TopToolbar
         onOpenNewModal={() => {}}
+        onOpenProjectsModal={() => {}}
         onOpenResizeModal={() => {}}
         onOpenExportModal={() => {}}
       />
     );
 
-    expect(screen.getByText('New')).toBeInTheDocument();
-    expect(screen.getByText('Open')).toBeInTheDocument();
-    expect(screen.getByText('Save')).toBeInTheDocument();
+    expect(screen.getByLabelText('New Project')).toBeInTheDocument();
+    expect(screen.getByLabelText('Open Project')).toBeInTheDocument();
+    expect(screen.getByLabelText('Import Project')).toBeInTheDocument();
+    expect(screen.getByLabelText('Save Project To Disc')).toBeInTheDocument();
+    expect(screen.getByLabelText('Resize')).toBeInTheDocument();
 
     const nameInput = screen.getByLabelText('Tên Project');
     fireEvent.change(nameInput, { target: { value: 'Game Banner 01' } });
     expect(useEditorStore.getState().projectName).toBe('Game Banner 01');
+  });
+
+  it('OpenProjectModal renders empty state when IndexedDB is unavailable', async () => {
+    render(<OpenProjectModal open={true} onClose={() => {}} />);
+    expect(
+      await screen.findByText('Chưa có project nào được lưu trong trình duyệt.')
+    ).toBeInTheDocument();
   });
 
   it('ExportModal defaults PNG compression to 8/10 and uses projectName or lastExportName', () => {

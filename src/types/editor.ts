@@ -204,6 +204,7 @@ export interface EditorEnvironment {
 
 export interface ProjectFile {
   version: 1;
+  id?: string;
   name: string;
   savedAt: string;
   canvas: CanvasConfig;

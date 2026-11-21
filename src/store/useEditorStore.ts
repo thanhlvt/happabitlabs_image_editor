@@ -69,6 +69,7 @@ function cloneSnapshot(
 }
 
 export interface EditorState {
+  projectId: string;
   projectName: string;
   lastSavedAt: string | null;
   lastExportName: string | null;
@@ -245,6 +246,7 @@ function persistPanelLayout(layout: PanelLayoutConfig): void {
 }
 
 export const useEditorStore = create<EditorState>((set, get) => ({
+  projectId: generateId('proj'),
   projectName: 'Untitled Project',
   lastSavedAt: null,
   lastExportName: null,
@@ -345,6 +347,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         : fallbackSelected;
 
     set((state) => ({
+      projectId: project.id || generateId('proj'),
       projectName: project.name || 'Untitled Project',
       lastSavedAt: project.savedAt ?? null,
       lastExportName: env?.lastExportName ?? null,
@@ -365,6 +368,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   newCanvas: (width, height, backgroundColor, projectName) => {
     get().pushHistory();
     set((state) => ({
+      projectId: generateId('proj'),
       projectName: projectName?.trim() || state.projectName || 'Untitled Project',
       lastExportName: null,
       canvas: {

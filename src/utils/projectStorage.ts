@@ -6,18 +6,22 @@ import type {
 } from '../types/editor';
 
 const DB_NAME = 'mistcanvas_db';
-const DB_VERSION = 1;
-const STORE_NAME = 'projects';
-const AUTOSAVE_KEY = 'current_autosave';
+const DB_VERSION = 2;
+const STORE_PROJECTS = 'projects';
+const STORE_META = 'meta';
+const LEGACY_AUTOSAVE_KEY = 'current_autosave';
+const ACTIVE_PROJECT_KEY = 'active_project_id';
 
 export function serializeProject(
   name: string,
   canvas: CanvasConfig,
   layers: Layer[],
-  environment?: EditorEnvironment
+  environment?: EditorEnvironment,
+  id?: string
 ): ProjectFile {
   return {
     version: 1,
+    ...(id ? { id } : {}),
     name: name.trim() || 'Untitled Project',
     savedAt: new Date().toISOString(),
     canvas: { ...canvas },
@@ -80,6 +84,7 @@ export function parseProjectFile(jsonText: string): ProjectFile {
 
   return {
     version: 1,
+    ...(typeof obj.id === 'string' && obj.id.trim() ? { id: obj.id } : {}),
     name: typeof obj.name === 'string' && obj.name.trim() ? obj.name : 'Imported Project',
     savedAt: typeof obj.savedAt === 'string' ? obj.savedAt : new Date().toISOString(),
     canvas: {
@@ -120,8 +125,11 @@ function openProjectDb(): Promise<IDBDatabase | null> {
       const req = indexedDB.open(DB_NAME, DB_VERSION);
       req.onupgradeneeded = () => {
         const db = req.result;
-        if (!db.objectStoreNames.contains(STORE_NAME)) {
-          db.createObjectStore(STORE_NAME);
+        if (!db.objectStoreNames.contains(STORE_PROJECTS)) {
+          db.createObjectStore(STORE_PROJECTS);
+        }
+        if (!db.objectStoreNames.contains(STORE_META)) {
+          db.createObjectStore(STORE_META);
         }
       };
       req.onsuccess = () => resolve(req.result);
@@ -135,11 +143,13 @@ function openProjectDb(): Promise<IDBDatabase | null> {
 export async function saveAutoSaveProject(project: ProjectFile): Promise<boolean> {
   const db = await openProjectDb();
   if (!db) return false;
+  const projectKey = project.id || LEGACY_AUTOSAVE_KEY;
+  const record: ProjectFile = { ...project, id: projectKey };
   return new Promise((resolve) => {
     try {
-      const tx = db.transaction(STORE_NAME, 'readwrite');
-      const store = tx.objectStore(STORE_NAME);
-      store.put(project, AUTOSAVE_KEY);
+      const tx = db.transaction([STORE_PROJECTS, STORE_META], 'readwrite');
+      tx.objectStore(STORE_PROJECTS).put(record, projectKey);
+      tx.objectStore(STORE_META).put(projectKey, ACTIVE_PROJECT_KEY);
       tx.oncomplete = () => {
         db.close();
         resolve(true);
@@ -160,25 +170,98 @@ export async function loadAutoSaveProject(): Promise<ProjectFile | null> {
   if (!db) return null;
   return new Promise((resolve) => {
     try {
-      const tx = db.transaction(STORE_NAME, 'readonly');
-      const store = tx.objectStore(STORE_NAME);
-      const req = store.get(AUTOSAVE_KEY);
-      req.onsuccess = () => {
-        db.close();
-        const res = req.result as ProjectFile | undefined;
-        if (res && res.canvas && Array.isArray(res.layers)) {
-          resolve(res);
-        } else {
+      const tx = db.transaction([STORE_PROJECTS, STORE_META], 'readonly');
+      const metaStore = tx.objectStore(STORE_META);
+      const projStore = tx.objectStore(STORE_PROJECTS);
+      const activeReq = metaStore.get(ACTIVE_PROJECT_KEY);
+
+      activeReq.onsuccess = () => {
+        const activeId = (activeReq.result as string | undefined) || LEGACY_AUTOSAVE_KEY;
+        const projReq = projStore.get(activeId);
+        projReq.onsuccess = () => {
+          db.close();
+          const res = projReq.result as ProjectFile | undefined;
+          if (res && res.canvas && Array.isArray(res.layers)) {
+            resolve({ ...res, id: res.id || activeId });
+          } else {
+            resolve(null);
+          }
+        };
+        projReq.onerror = () => {
+          db.close();
           resolve(null);
-        }
+        };
       };
-      req.onerror = () => {
+      activeReq.onerror = () => {
         db.close();
         resolve(null);
       };
     } catch {
       db.close();
       resolve(null);
+    }
+  });
+}
+
+export async function listSavedProjects(): Promise<ProjectFile[]> {
+  const db = await openProjectDb();
+  if (!db) return [];
+  return new Promise((resolve) => {
+    try {
+      const tx = db.transaction(STORE_PROJECTS, 'readonly');
+      const store = tx.objectStore(STORE_PROJECTS);
+      const keysReq = store.getAllKeys();
+      const valsReq = store.getAll();
+
+      tx.oncomplete = () => {
+        db.close();
+        const keys = keysReq.result ?? [];
+        const vals = (valsReq.result ?? []) as ProjectFile[];
+        const items: ProjectFile[] = [];
+        for (let i = 0; i < vals.length; i++) {
+          const item = vals[i];
+          if (item && item.canvas && Array.isArray(item.layers)) {
+            items.push({
+              ...item,
+              id: item.id || String(keys[i]),
+            });
+          }
+        }
+        items.sort(
+          (a, b) =>
+            new Date(b.savedAt).getTime() - new Date(a.savedAt).getTime()
+        );
+        resolve(items);
+      };
+      tx.onerror = () => {
+        db.close();
+        resolve([]);
+      };
+    } catch {
+      db.close();
+      resolve([]);
+    }
+  });
+}
+
+export async function deleteSavedProject(id: string): Promise<boolean> {
+  const db = await openProjectDb();
+  if (!db) return false;
+  return new Promise((resolve) => {
+    try {
+      const tx = db.transaction(STORE_PROJECTS, 'readwrite');
+      tx.objectStore(STORE_PROJECTS).delete(id);
+      tx.oncomplete = () => {
+        db.close();
+        resolve(true);
+      };
+      tx.onerror = () => {
+        db.close();
+        resolve(false);
+      };
+    } catch {
+      db.close();
+      resolve(false);
     }
   });
 }
