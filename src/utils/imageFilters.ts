@@ -1,6 +1,15 @@
-import type { ImageAdjustments } from '../types/editor';
+import type { BackgroundRemovalConfig, ImageAdjustments } from '../types/editor';
 import { clamp } from './geometry';
 import { hexToRgb } from './fogRenderer';
+
+export function createDefaultBackgroundRemoval(): BackgroundRemovalConfig {
+  return {
+    enabled: false,
+    color: '#ffffff',
+    tolerance: 18,
+    softness: 10,
+  };
+}
 
 export function createDefaultImageAdjustments(): ImageAdjustments {
   return {
@@ -11,6 +20,7 @@ export function createDefaultImageAdjustments(): ImageAdjustments {
     vibrance: 0,
     saturation: 0,
     colorEdits: [],
+    backgroundRemoval: createDefaultBackgroundRemoval(),
   };
 }
 
@@ -23,7 +33,8 @@ export function hasActiveAdjustments(adj?: ImageAdjustments): boolean {
     adj.tint !== 0 ||
     adj.vibrance !== 0 ||
     adj.saturation !== 0 ||
-    adj.colorEdits.length > 0
+    adj.colorEdits.length > 0 ||
+    Boolean(adj.backgroundRemoval?.enabled)
   );
 }
 
@@ -43,7 +54,16 @@ export function processImageData(
     vibrance,
     saturation,
     colorEdits,
+    backgroundRemoval,
   } = adjustments;
+
+  const bgRemove = backgroundRemoval?.enabled
+    ? {
+        rgb: hexToRgb(backgroundRemoval.color || '#ffffff'),
+        maxDist: (clamp(backgroundRemoval.tolerance, 0, 100) / 100) * 260,
+        softDist: (clamp(backgroundRemoval.softness, 0, 50) / 100) * 260,
+      }
+    : null;
 
   const parsedEdits = colorEdits.map((rule) => ({
     src: hexToRgb(rule.sourceColor),
@@ -76,6 +96,25 @@ export function processImageData(
     let r = data[i];
     let g = data[i + 1];
     let b = data[i + 2];
+
+    // 0. Remove Background (set alpha to 0 for matching color)
+    if (bgRemove) {
+      const dr = r - bgRemove.rgb.r;
+      const dg = g - bgRemove.rgb.g;
+      const db = b - bgRemove.rgb.b;
+      const dist = Math.sqrt(dr * dr + dg * dg + db * db);
+
+      if (dist <= bgRemove.maxDist) {
+        data[i + 3] = 0;
+        continue;
+      } else if (
+        bgRemove.softDist > 0 &&
+        dist <= bgRemove.maxDist + bgRemove.softDist
+      ) {
+        const factor = (dist - bgRemove.maxDist) / bgRemove.softDist;
+        data[i + 3] = clamp(Math.round(data[i + 3] * factor), 0, 255);
+      }
+    }
 
     // 1. Color Edit (replace source color with target color)
     for (let j = 0; j < parsedEdits.length; j++) {

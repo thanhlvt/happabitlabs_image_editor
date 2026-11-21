@@ -100,4 +100,38 @@ describe('imageFilters', () => {
     expect(data[5]).toBe(0);
     expect(data[7]).toBe(200);
   });
+
+  it('removes #ffffff background by default to transparent alpha and supports custom colors', () => {
+    // Pixel 1: pure white (#ffffff), Pixel 2: dark blue (#102080)
+    const data = new Uint8ClampedArray([
+      255, 255, 255, 255,
+      16, 32, 128, 255,
+    ]);
+    processImageData(data, {
+      ...createDefaultImageAdjustments(),
+      backgroundRemoval: {
+        enabled: true,
+        color: '#ffffff',
+        tolerance: 15,
+        softness: 5,
+      },
+    });
+
+    expect(data[3]).toBe(0); // White background becomes transparent
+    expect(data[7]).toBe(255); // Non-matching pixel stays opaque
+
+    // Remove custom green color
+    const greenData = new Uint8ClampedArray([0, 255, 0, 255, 255, 255, 255, 255]);
+    processImageData(greenData, {
+      ...createDefaultImageAdjustments(),
+      backgroundRemoval: {
+        enabled: true,
+        color: '#00ff00',
+        tolerance: 10,
+        softness: 0,
+      },
+    });
+    expect(greenData[3]).toBe(0);
+    expect(greenData[7]).toBe(255);
+  });
 });

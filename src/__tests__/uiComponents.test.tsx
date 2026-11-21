@@ -273,4 +273,38 @@ describe('Editor UI Components', () => {
     expect(reordered[0].id).toBe(secondId);
     expect(reordered[1].id).toBe(firstId);
   });
+
+  it('ImageAdjustmentsPanel enables Remove Background with #ffffff default and eyedropper', () => {
+    useEditorStore.getState().newCanvas(800, 600, null);
+    useEditorStore.getState().insertImages([
+      {
+        src: 'data:image/png;base64,test',
+        name: 'Logo',
+        width: 200,
+        height: 100,
+      },
+    ]);
+
+    render(<PropertiesPanel onOpenResizeModal={() => {}} />);
+
+    fireEvent.click(screen.getByText('Xóa nền'));
+    const layer = useEditorStore.getState().layers[0];
+    expect(layer.type).toBe('image');
+    if (layer.type === 'image') {
+      expect(layer.adjustments?.backgroundRemoval).toMatchObject({
+        enabled: true,
+        color: '#ffffff',
+      });
+    }
+
+    fireEvent.click(screen.getByText('Hút màu xóa'));
+    expect(useEditorStore.getState().activeTool).toBe('eyedropper');
+    useEditorStore.getState().pickEyedropperColor('#00ff00');
+
+    const afterPick = useEditorStore.getState().layers[0];
+    if (afterPick.type === 'image') {
+      expect(afterPick.adjustments?.backgroundRemoval?.color).toBe('#00ff00');
+      expect(afterPick.adjustments?.backgroundRemoval?.enabled).toBe(true);
+    }
+  });
 });

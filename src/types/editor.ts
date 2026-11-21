@@ -43,6 +43,16 @@ export interface ColorEditRule {
   softness: number;
 }
 
+export interface BackgroundRemovalConfig {
+  enabled: boolean;
+  /** Hex color to remove, defaults to "#ffffff" */
+  color: string;
+  /** 0 to 100 */
+  tolerance: number;
+  /** 0 to 50 */
+  softness: number;
+}
+
 export interface ImageAdjustments {
   /** -100 to 100 */
   brightness: number;
@@ -57,6 +67,7 @@ export interface ImageAdjustments {
   /** -100 to 100 */
   saturation: number;
   colorEdits: ColorEditRule[];
+  backgroundRemoval?: BackgroundRemovalConfig;
 }
 
 export interface ImageLayer extends BaseLayer {
@@ -122,6 +133,7 @@ export interface CropRect {
 export type EyedropperTarget =
   | { kind: 'fog-stop'; layerId: string; stopId: string }
   | { kind: 'fog-fade'; layerId: string }
+  | { kind: 'bg-remove'; layerId: string }
   | {
       kind: 'color-edit';
       layerId: string;

@@ -146,6 +146,7 @@ export interface EditorState {
   ) => void;
   startEyedropper: (layerId: string, stopId: string) => void;
   startFogFadeEyedropper: (layerId: string) => void;
+  startBgRemoveEyedropper: (layerId: string) => void;
   startColorEditEyedropper: (
     layerId: string,
     ruleId: string,
@@ -809,6 +810,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       eyedropperTarget: { kind: 'fog-fade', layerId },
     }),
 
+  startBgRemoveEyedropper: (layerId) =>
+    set({
+      activeTool: 'eyedropper',
+      eyedropperTarget: { kind: 'bg-remove', layerId },
+    }),
+
   startColorEditEyedropper: (layerId, ruleId, field) =>
     set({
       activeTool: 'eyedropper',
@@ -827,6 +834,26 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       );
     } else if (eyedropperTarget.kind === 'fog-fade') {
       get().updateLayer(eyedropperTarget.layerId, { fadeColor: hex }, true);
+    } else if (eyedropperTarget.kind === 'bg-remove') {
+      const targetLayer = get().layers.find(
+        (l) => l.id === eyedropperTarget.layerId
+      );
+      const currentBg =
+        targetLayer?.type === 'image'
+          ? targetLayer.adjustments?.backgroundRemoval
+          : undefined;
+      get().updateImageAdjustments(
+        eyedropperTarget.layerId,
+        {
+          backgroundRemoval: {
+            enabled: true,
+            color: hex,
+            tolerance: currentBg?.tolerance ?? 18,
+            softness: currentBg?.softness ?? 10,
+          },
+        },
+        true
+      );
     } else {
       get().updateColorEditRule(
         eyedropperTarget.layerId,
