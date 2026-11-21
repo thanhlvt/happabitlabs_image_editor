@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Download, X } from 'lucide-react';
 import type { ExportFormat } from '../../types/editor';
 import { useEditorStore } from '../../store/useEditorStore';
@@ -11,12 +11,22 @@ interface ExportModalProps {
 }
 
 export const ExportModal: React.FC<ExportModalProps> = ({ open, onClose }) => {
-  const { canvas, layers } = useEditorStore();
-  const [filename, setFilename] = useState('edited-image');
+  const { canvas, layers, projectName, lastExportName, setLastExportName } =
+    useEditorStore();
+  const [filename, setFilename] = useState(
+    lastExportName ?? (projectName.trim() || 'edited-image')
+  );
   const [format, setFormat] = useState<ExportFormat>('image/png');
   const [scale, setScale] = useState<1 | 2>(1);
   const [quality, setQuality] = useState(0.92);
+  const [pngCompression, setPngCompression] = useState(8);
   const [exporting, setExporting] = useState(false);
+
+  useEffect(() => {
+    if (open) {
+      setFilename(lastExportName ?? (projectName.trim() || 'edited-image'));
+    }
+  }, [open, lastExportName, projectName]);
 
   if (!open) return null;
 
@@ -26,8 +36,17 @@ export const ExportModal: React.FC<ExportModalProps> = ({ open, onClose }) => {
     e.preventDefault();
     setExporting(true);
     try {
-      const dataUrl = await exportCanvasToDataUrl(canvas, layers, format, quality, scale);
-      downloadDataUrl(dataUrl, `${filename.trim() || 'edited-image'}.${ext}`);
+      const dataUrl = await exportCanvasToDataUrl(
+        canvas,
+        layers,
+        format,
+        quality,
+        scale,
+        pngCompression
+      );
+      const finalName = filename.trim() || projectName.trim() || 'edited-image';
+      setLastExportName(finalName);
+      downloadDataUrl(dataUrl, `${finalName}.${ext}`);
       onClose();
     } finally {
       setExporting(false);
@@ -120,7 +139,29 @@ export const ExportModal: React.FC<ExportModalProps> = ({ open, onClose }) => {
             </div>
           </div>
 
-          {format !== 'image/png' && (
+          {format === 'image/png' ? (
+            <div>
+              <div className="flex justify-between text-slate-400 mb-1">
+                <span>Độ nén PNG</span>
+                <span className="font-mono text-cyan-300">{pngCompression}/10</span>
+              </div>
+              <input
+                type="range"
+                aria-label="Độ nén PNG"
+                min={1}
+                max={10}
+                step={1}
+                value={pngCompression}
+                onChange={(e) => setPngCompression(Number(e.target.value))}
+                className="w-full accent-cyan-400"
+              />
+              <p className="text-[11px] text-slate-500 mt-1">
+                {pngCompression <= 3
+                  ? 'Lossless RGBA (không mất dữ liệu, file lớn hơn)'
+                  : 'Nén thông minh giữ kênh Alpha (mức cao giúp giảm dung lượng mạnh)'}
+              </p>
+            </div>
+          ) : (
             <div>
               <div className="flex justify-between text-slate-400 mb-1">
                 <span>Chất lượng nén</span>

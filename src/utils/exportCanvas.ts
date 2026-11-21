@@ -1,6 +1,8 @@
+import UPNG from 'upng-js';
 import type { CanvasConfig, ExportFormat, Layer } from '../types/editor';
 import { loadImageElement } from './fileHelpers';
 import { renderFogToCanvas } from './fogRenderer';
+import { clamp } from './geometry';
 import {
   applyImageAdjustmentsToCanvas,
   hasActiveAdjustments,
@@ -114,14 +116,66 @@ export async function renderCompositeCanvas(
 }
 
 /**
- * Export canvas to a Data URL (PNG keeps full RGBA alpha channel).
+ * Map PNG compression level (1..10, default 8) to UPNG color quantization count (cnum).
+ * - 1..3: 0 (lossless 32-bit RGBA PNG)
+ * - 4..10: smart quantized RGBA (preserves 8-bit alpha, higher level = smaller file)
+ */
+export function mapPngCompressionToColors(level: number): number {
+  const lv = Math.round(clamp(level, 1, 10));
+  if (lv <= 3) return 0;
+  const table: Record<number, number> = {
+    4: 1024,
+    5: 512,
+    6: 384,
+    7: 320,
+    8: 256,
+    9: 160,
+    10: 96,
+  };
+  return table[lv] ?? 256;
+}
+
+function arrayBufferToBase64(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer);
+  const chunkSize = 0x8000;
+  let binary = '';
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+  }
+  return btoa(binary);
+}
+
+/**
+ * Encode an HTMLCanvasElement to a compressed PNG Data URL (preserving full RGBA alpha).
+ */
+export function encodeCanvasToPngDataUrl(
+  canvas: HTMLCanvasElement,
+  compressionLevel = 8
+): string {
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return canvas.toDataURL('image/png');
+  const { width, height } = canvas;
+  const imageData = ctx.getImageData(0, 0, width, height);
+  // Copy into a tightly-packed ArrayBuffer for UPNG
+  const rgbaBuffer = imageData.data.buffer.slice(
+    imageData.data.byteOffset,
+    imageData.data.byteOffset + imageData.data.byteLength
+  );
+  const cnum = mapPngCompressionToColors(compressionLevel);
+  const pngBuffer = UPNG.encode([rgbaBuffer], width, height, cnum);
+  return `data:image/png;base64,${arrayBufferToBase64(pngBuffer)}`;
+}
+
+/**
+ * Export canvas to a Data URL (PNG keeps full RGBA alpha channel and supports compression 1-10).
  */
 export async function exportCanvasToDataUrl(
   canvasConfig: CanvasConfig,
   layers: Layer[],
   format: ExportFormat = 'image/png',
   quality = 0.92,
-  scale = 1
+  scale = 1,
+  pngCompression = 8
 ): Promise<string> {
   // For JPEG (no alpha channel), flatten onto white if backgroundColor is null
   const effectiveConfig: CanvasConfig =
@@ -130,5 +184,8 @@ export async function exportCanvasToDataUrl(
       : canvasConfig;
 
   const rendered = await renderCompositeCanvas(effectiveConfig, layers, { scale });
+  if (format === 'image/png') {
+    return encodeCanvasToPngDataUrl(rendered, pngCompression);
+  }
   return rendered.toDataURL(format, quality);
 }

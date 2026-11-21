@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { NewCanvasModal } from '../components/Modals/NewCanvasModal';
+import { ExportModal } from '../components/Modals/ExportModal';
 import { LayerPanel } from '../components/Panels/LayerPanel';
 import { PropertiesPanel } from '../components/Panels/PropertiesPanel';
 import { TopToolbar } from '../components/Toolbar/TopToolbar';
@@ -200,5 +201,29 @@ describe('Editor UI Components', () => {
     const nameInput = screen.getByLabelText('Tên Project');
     fireEvent.change(nameInput, { target: { value: 'Game Banner 01' } });
     expect(useEditorStore.getState().projectName).toBe('Game Banner 01');
+  });
+
+  it('ExportModal defaults PNG compression to 8/10 and uses projectName or lastExportName', () => {
+    useEditorStore.setState({
+      projectName: 'Hero Banner',
+      lastExportName: null,
+    });
+    const { rerender } = render(<ExportModal open={true} onClose={() => {}} />);
+
+    const nameInput = screen.getByDisplayValue('Hero Banner') as HTMLInputElement;
+    expect(nameInput).toBeInTheDocument();
+
+    expect(screen.getByText('8/10')).toBeInTheDocument();
+    const slider = screen.getByLabelText('Độ nén PNG') as HTMLInputElement;
+    expect(slider.value).toBe('8');
+
+    fireEvent.change(slider, { target: { value: '10' } });
+    expect(screen.getByText('10/10')).toBeInTheDocument();
+
+    // When lastExportName exists, reopening ExportModal defaults to lastExportName
+    useEditorStore.setState({ lastExportName: 'custom-exported-v2' });
+    rerender(<ExportModal open={false} onClose={() => {}} />);
+    rerender(<ExportModal open={true} onClose={() => {}} />);
+    expect(screen.getByDisplayValue('custom-exported-v2')).toBeInTheDocument();
   });
 });

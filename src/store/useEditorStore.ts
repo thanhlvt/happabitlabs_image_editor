@@ -59,6 +59,7 @@ function cloneSnapshot(
 export interface EditorState {
   projectName: string;
   lastSavedAt: string | null;
+  lastExportName: string | null;
   canvas: CanvasConfig;
   layers: Layer[];
   selectedLayerId: string | null;
@@ -80,6 +81,7 @@ export interface EditorState {
   // Project & Canvas actions
   setProjectName: (name: string) => void;
   setLastSavedAt: (iso: string | null) => void;
+  setLastExportName: (name: string | null) => void;
   loadProject: (project: ProjectFile) => void;
   newCanvas: (
     width: number,
@@ -154,6 +156,7 @@ const DEFAULT_CANVAS: CanvasConfig = {
 export const useEditorStore = create<EditorState>((set, get) => ({
   projectName: 'Untitled Project',
   lastSavedAt: null,
+  lastExportName: null,
   canvas: DEFAULT_CANVAS,
   layers: [],
   selectedLayerId: null,
@@ -211,10 +214,13 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
   setLastSavedAt: (iso) => set({ lastSavedAt: iso }),
 
+  setLastExportName: (name) => set({ lastExportName: name }),
+
   loadProject: (project) => {
     set({
       projectName: project.name || 'Untitled Project',
       lastSavedAt: project.savedAt ?? null,
+      lastExportName: null,
       canvas: { ...project.canvas },
       layers: project.layers,
       selectedLayerId: project.layers[project.layers.length - 1]?.id ?? null,
@@ -230,6 +236,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     get().pushHistory();
     set((state) => ({
       projectName: projectName?.trim() || state.projectName || 'Untitled Project',
+      lastExportName: null,
       canvas: {
         width: Math.max(1, Math.round(width)),
         height: Math.max(1, Math.round(height)),
