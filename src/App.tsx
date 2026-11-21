@@ -2,8 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { TopToolbar } from './components/Toolbar/TopToolbar';
 import { LeftToolRail } from './components/Toolbar/LeftToolRail';
 import { EditorCanvas } from './components/Canvas/EditorCanvas';
-import { PropertiesPanel } from './components/Panels/PropertiesPanel';
-import { LayerPanel } from './components/Panels/LayerPanel';
+import { WorkspacePanels } from './components/Panels/WorkspacePanels';
 import { NewCanvasModal } from './components/Modals/NewCanvasModal';
 import { ResizeModal } from './components/Modals/ResizeModal';
 import { ExportModal } from './components/Modals/ExportModal';
@@ -180,13 +179,10 @@ export function App() {
 
       <div className="flex-1 flex min-h-0">
         <LeftToolRail />
-        <EditorCanvas />
-
-        {/* Right Inspector Sidebar */}
-        <aside className="w-[300px] bg-[#161920] border-l border-slate-800 flex flex-col shrink-0 min-h-0">
-          <PropertiesPanel onOpenResizeModal={() => setResizeModalOpen(true)} />
-          <LayerPanel />
-        </aside>
+        <WorkspacePanels
+          canvasSlot={<EditorCanvas />}
+          onOpenResizeModal={() => setResizeModalOpen(true)}
+        />
       </div>
 
       <NewCanvasModal open={newModalOpen} onClose={() => setNewModalOpen(false)} />

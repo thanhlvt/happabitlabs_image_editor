@@ -6,6 +6,8 @@ import {
   AlignVerticalJustifyEnd,
   AlignVerticalJustifyStart,
   Crop,
+  FlipHorizontal2,
+  FlipVertical2,
   Lock,
   Maximize,
   MoveHorizontal,
@@ -41,7 +43,7 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
 
   if (!layer) {
     return (
-      <div className="p-3.5 space-y-3 text-xs border-b border-slate-800">
+      <div className="p-3.5 space-y-3 text-xs h-full overflow-y-auto">
         <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
           Canvas Settings
         </div>
@@ -124,7 +126,7 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
   };
 
   return (
-    <div className="p-3.5 space-y-3.5 text-xs border-b border-slate-800 overflow-y-auto max-h-[58vh]">
+    <div className="p-3.5 space-y-3.5 text-xs overflow-y-auto h-full">
       <div className="flex items-center justify-between">
         <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
           {layer.type === 'fog' ? 'Thuộc tính Sương mờ' : 'Thuộc tính Ảnh'}
@@ -260,6 +262,34 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
             />
             <span className="text-slate-500">°</span>
           </label>
+          <button
+            type="button"
+            aria-label="Flip horizontal"
+            title="Lật ngang (Flip horizontal)"
+            aria-pressed={Boolean(layer.flipX)}
+            onClick={() => updateLayer(layer.id, { flipX: !layer.flipX }, true)}
+            className={`p-1.5 rounded transition ${
+              layer.flipX
+                ? 'bg-blue-600 text-white'
+                : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
+            }`}
+          >
+            <FlipHorizontal2 className="w-3.5 h-3.5" />
+          </button>
+          <button
+            type="button"
+            aria-label="Flip vertical"
+            title="Lật dọc (Flip vertical)"
+            aria-pressed={Boolean(layer.flipY)}
+            onClick={() => updateLayer(layer.id, { flipY: !layer.flipY }, true)}
+            className={`p-1.5 rounded transition ${
+              layer.flipY
+                ? 'bg-blue-600 text-white'
+                : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
+            }`}
+          >
+            <FlipVertical2 className="w-3.5 h-3.5" />
+          </button>
           <button
             type="button"
             onClick={() =>

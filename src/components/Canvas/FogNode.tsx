@@ -77,6 +77,8 @@ export const FogNode: React.FC<FogNodeProps> = ({
       width={layer.width}
       height={layer.height}
       rotation={layer.rotation}
+      scaleX={layer.flipX ? -1 : 1}
+      scaleY={layer.flipY ? -1 : 1}
       opacity={layer.opacity}
       draggable={interactive && !layer.locked}
       listening={interactive && !layer.locked}
@@ -95,10 +97,10 @@ export const FogNode: React.FC<FogNodeProps> = ({
       }}
       onTransformEnd={(e) => {
         const node = e.target as Konva.Image;
-        const scaleX = node.scaleX();
-        const scaleY = node.scaleY();
-        node.scaleX(1);
-        node.scaleY(1);
+        const scaleX = Math.abs(node.scaleX());
+        const scaleY = Math.abs(node.scaleY());
+        node.scaleX(layer.flipX ? -1 : 1);
+        node.scaleY(layer.flipY ? -1 : 1);
 
         const newW = Math.max(8, Math.round(layer.width * scaleX));
         const newH = Math.max(8, Math.round(layer.height * scaleY));

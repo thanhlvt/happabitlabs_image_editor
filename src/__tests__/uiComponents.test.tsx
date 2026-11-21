@@ -5,6 +5,7 @@ import { ExportModal } from '../components/Modals/ExportModal';
 import { LayerPanel } from '../components/Panels/LayerPanel';
 import { PropertiesPanel } from '../components/Panels/PropertiesPanel';
 import { TopToolbar } from '../components/Toolbar/TopToolbar';
+import { WorkspacePanels } from '../components/Panels/WorkspacePanels';
 import { useEditorStore } from '../store/useEditorStore';
 
 describe('Editor UI Components', () => {
@@ -112,6 +113,12 @@ describe('Editor UI Components', () => {
 
     fireEvent.click(screen.getByLabelText('Align bottom'));
     expect(useEditorStore.getState().layers[0].y).toBe(0);
+
+    fireEvent.click(screen.getByLabelText('Flip horizontal'));
+    expect(useEditorStore.getState().layers[0].flipX).toBe(true);
+
+    fireEvent.click(screen.getByLabelText('Flip vertical'));
+    expect(useEditorStore.getState().layers[0].flipY).toBe(true);
   });
 
   it('ImageAdjustmentsPanel updates sliders, adds Color Edit rule, and resets', () => {
@@ -225,5 +232,23 @@ describe('Editor UI Components', () => {
     rerender(<ExportModal open={false} onClose={() => {}} />);
     rerender(<ExportModal open={true} onClose={() => {}} />);
     expect(screen.getByDisplayValue('custom-exported-v2')).toBeInTheDocument();
+  });
+
+  it('WorkspacePanels toggles between merged and split 2-column layout', () => {
+    render(
+      <WorkspacePanels
+        canvasSlot={<div data-testid="canvas-slot" />}
+        onOpenResizeModal={() => {}}
+      />
+    );
+
+    expect(screen.getByText('Thuộc tính & Layers')).toBeInTheDocument();
+    fireEvent.click(screen.getByText('Tách 2 cột'));
+
+    expect(screen.getByText('Layers Panel')).toBeInTheDocument();
+    expect(screen.getAllByText('Gộp chung').length).toBeGreaterThanOrEqual(1);
+
+    fireEvent.click(screen.getAllByText('Gộp chung')[0]);
+    expect(screen.getByText('Thuộc tính & Layers')).toBeInTheDocument();
   });
 });

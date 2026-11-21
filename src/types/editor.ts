@@ -24,6 +24,8 @@ export interface BaseLayer {
   width: number;
   height: number;
   rotation: number;
+  flipX?: boolean;
+  flipY?: boolean;
   /** Overall layer alpha (0.0 to 1.0) */
   opacity: number;
   visible: boolean;

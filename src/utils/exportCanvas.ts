@@ -70,6 +70,7 @@ export async function renderCompositeCanvas(
       const cy = (layer.y + layer.height / 2) * scale;
       ctx.translate(cx, cy);
       ctx.rotate((layer.rotation * Math.PI) / 180);
+      ctx.scale(layer.flipX ? -1 : 1, layer.flipY ? -1 : 1);
       ctx.drawImage(
         sourceDrawable,
         layer.cropX,
@@ -106,6 +107,7 @@ export async function renderCompositeCanvas(
       const cy = (layer.y + layer.height / 2) * scale;
       ctx.translate(cx, cy);
       ctx.rotate((layer.rotation * Math.PI) / 180);
+      ctx.scale(layer.flipX ? -1 : 1, layer.flipY ? -1 : 1);
       ctx.drawImage(fogCanvas, (-layer.width * scale) / 2, (-layer.height * scale) / 2);
     }
 
