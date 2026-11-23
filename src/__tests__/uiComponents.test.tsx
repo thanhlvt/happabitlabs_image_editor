@@ -126,6 +126,12 @@ describe('Editor UI Components', () => {
 
     fireEvent.click(screen.getByLabelText('Flip vertical'));
     expect(useEditorStore.getState().layers[0].flipY).toBe(true);
+
+    fireEvent.click(screen.getByLabelText('Resize 1080x2600'));
+    expect(useEditorStore.getState().layers[0]).toMatchObject({
+      width: 1080,
+      height: 2600,
+    });
   });
 
   it('ImageAdjustmentsPanel updates sliders, adds Color Edit rule, and resets', () => {

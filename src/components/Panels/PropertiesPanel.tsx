@@ -501,6 +501,18 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
             <MoveVertical className="w-3.5 h-3.5" />
           </button>
         </div>
+
+        <button
+          type="button"
+          aria-label="Resize 1080x2600"
+          title="Resize object thành 1080 × 2600"
+          onClick={() =>
+            updateLayer(layer.id, { width: 1080, height: 2600 }, true)
+          }
+          className="w-full py-1 px-2 rounded bg-[#0f1115] border border-slate-800 hover:border-cyan-500/60 hover:text-cyan-300 text-slate-300 text-[11px] font-mono transition"
+        >
+          1080 × 2600
+        </button>
       </CollapsibleSection>
 
       {/* Fog-specific or Image-specific controls */}
