@@ -440,4 +440,59 @@ describe('Editor UI Components', () => {
     fireEvent.click(screen.getByLabelText('Xoay trái 90 độ'));
     expect(useEditorStore.getState().layers[0].rotation).toBe(0);
   });
+
+  it('PropertiesPanel Copy properties button copies attributes to the next selected layer', () => {
+    useEditorStore.getState().newCanvas(1000, 800, null);
+    useEditorStore.getState().insertImages([
+      {
+        src: 'data:image/png;base64,one',
+        name: 'Object 1',
+        width: 300,
+        height: 200,
+      },
+      {
+        src: 'data:image/png;base64,two',
+        name: 'Object 2',
+        width: 100,
+        height: 100,
+      },
+    ]);
+
+    const [obj1, obj2] = useEditorStore.getState().layers;
+    useEditorStore.getState().updateLayer(obj1.id, {
+      x: 42,
+      y: 84,
+      width: 360,
+      height: 240,
+      opacity: 0.5,
+    });
+    useEditorStore.getState().setSelectedLayer(obj1.id);
+
+    render(
+      <div>
+        <PropertiesPanel onOpenResizeModal={() => {}} />
+        <LayerPanel />
+      </div>
+    );
+
+    fireEvent.click(screen.getByText('Copy properties'));
+    expect(
+      screen.getByText('Chọn object khác để dán thuộc tính (Esc để hủy)')
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText('Object 2'));
+
+    expect(
+      screen.queryByText('Chọn object khác để dán thuộc tính (Esc để hủy)')
+    ).not.toBeInTheDocument();
+    expect(useEditorStore.getState().layers[1]).toMatchObject({
+      id: obj2.id,
+      name: 'Object 2',
+      x: 42,
+      y: 84,
+      width: 360,
+      height: 240,
+      opacity: 0.5,
+    });
+  });
 });

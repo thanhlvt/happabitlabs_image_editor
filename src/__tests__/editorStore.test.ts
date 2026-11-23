@@ -136,4 +136,146 @@ describe('useEditorStore', () => {
     useEditorStore.getState().redo();
     expect(useEditorStore.getState().canvas.width).toBe(800);
   });
+
+  it('copies all properties from object 1 to object 2 on selection (image and fog)', () => {
+    const store = useEditorStore.getState();
+    store.newCanvas(1200, 900, null);
+    store.insertImages([
+      {
+        src: 'data:image/png;base64,img1',
+        name: 'Image 1',
+        width: 400,
+        height: 300,
+      },
+      {
+        src: 'data:image/png;base64,img2',
+        name: 'Image 2',
+        width: 200,
+        height: 150,
+      },
+    ]);
+
+    const [img1, img2] = useEditorStore.getState().layers;
+    useEditorStore.getState().updateLayer(img1.id, {
+      x: 55,
+      y: 75,
+      width: 500,
+      height: 375,
+      rotation: 25,
+      flipX: true,
+      flipY: false,
+      opacity: 0.65,
+      lockAspectRatio: false,
+      adjustments: {
+        brightness: 30,
+        contrast: 15,
+        temperature: -10,
+        tint: 5,
+        vibrance: 20,
+        saturation: -25,
+        colorEdits: [
+          {
+            id: 'ce1',
+            sourceColor: '#ff0000',
+            targetColor: '#00ff00',
+            tolerance: 20,
+            softness: 10,
+          },
+        ],
+        backgroundRemoval: {
+          enabled: true,
+          color: '#ffffff',
+          tolerance: 30,
+          softness: 12,
+        },
+      },
+    });
+
+    // Start copy from img1, then select img2
+    useEditorStore.getState().startCopyProperties(img1.id);
+    expect(useEditorStore.getState().copiedPropertiesFromId).toBe(img1.id);
+
+    useEditorStore.getState().setSelectedLayer(img2.id);
+    expect(useEditorStore.getState().copiedPropertiesFromId).toBeNull();
+    expect(useEditorStore.getState().selectedLayerId).toBe(img2.id);
+
+    const updatedImg2 = useEditorStore.getState().layers[1];
+    expect(updatedImg2).toMatchObject({
+      id: img2.id,
+      name: 'Image 2',
+      x: 55,
+      y: 75,
+      width: 500,
+      height: 375,
+      rotation: 25,
+      flipX: true,
+      flipY: false,
+      opacity: 0.65,
+      lockAspectRatio: false,
+    });
+    if (updatedImg2.type === 'image') {
+      expect(updatedImg2.src).toBe('data:image/png;base64,img2');
+      expect(updatedImg2.adjustments).toMatchObject({
+        brightness: 30,
+        contrast: 15,
+        saturation: -25,
+        backgroundRemoval: {
+          enabled: true,
+          color: '#ffffff',
+          tolerance: 30,
+          softness: 12,
+        },
+      });
+      expect(updatedImg2.adjustments?.colorEdits).toHaveLength(1);
+      expect(updatedImg2.adjustments?.colorEdits[0].sourceColor).toBe('#ff0000');
+      expect(updatedImg2.adjustments?.colorEdits[0].id).not.toBe('ce1');
+    }
+
+    // Undo restores img2 original bounds
+    useEditorStore.getState().undo();
+    const revertedImg2 = useEditorStore.getState().layers[1];
+    expect(revertedImg2.width).toBe(200);
+    expect(revertedImg2.opacity).toBe(1);
+
+    // Test FogLayer -> FogLayer copy
+    useEditorStore.getState().addFogLayer();
+    useEditorStore.getState().addFogLayer();
+    const fog1 = useEditorStore.getState().layers[2];
+    const fog2 = useEditorStore.getState().layers[3];
+    useEditorStore.getState().updateLayer(fog1.id, {
+      x: 10,
+      y: 20,
+      width: 600,
+      height: 400,
+      opacity: 0.4,
+      blurRadius: 48,
+      colorIntensity: 0.85,
+      angle: 135,
+      stops: [
+        { id: 's1', offset: 0, color: '#112233', alpha: 0.9 },
+        { id: 's2', offset: 1, color: '#445566', alpha: 0.1 },
+      ],
+    });
+
+    useEditorStore.getState().startCopyProperties(fog1.id);
+    useEditorStore.getState().setSelectedLayer(fog2.id);
+
+    const updatedFog2 = useEditorStore.getState().layers[3];
+    expect(updatedFog2).toMatchObject({
+      id: fog2.id,
+      x: 10,
+      y: 20,
+      width: 600,
+      height: 400,
+      opacity: 0.4,
+      blurRadius: 48,
+      colorIntensity: 0.85,
+      angle: 135,
+    });
+    if (updatedFog2.type === 'fog') {
+      expect(updatedFog2.stops).toHaveLength(2);
+      expect(updatedFog2.stops[0].color).toBe('#112233');
+      expect(updatedFog2.stops[0].id).not.toBe('s1');
+    }
+  });
 });

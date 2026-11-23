@@ -91,6 +91,7 @@ export interface EditorState {
   selectionOperation: SelectionOperation;
   selection: CanvasSelection | null;
   selectionClipboard: CopiedSelectionResult | null;
+  copiedPropertiesFromId: string | null;
   openPropertySections: Record<
     'alpha' | 'transform' | 'bg-remove' | 'color-adjust',
     boolean
@@ -197,6 +198,8 @@ export interface EditorState {
     section: 'alpha' | 'transform' | 'bg-remove' | 'color-adjust',
     open: boolean
   ) => void;
+  startCopyProperties: (layerId: string) => void;
+  cancelCopyProperties: () => void;
 }
 
 const DEFAULT_CANVAS: CanvasConfig = {
@@ -268,6 +271,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   selectionOperation: 'replace',
   selection: null,
   selectionClipboard: null,
+  copiedPropertiesFromId: null,
   openPropertySections: {
     alpha: true,
     transform: true,
@@ -835,7 +839,96 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     set({ layers: next });
   },
 
-  setSelectedLayer: (id) => set({ selectedLayerId: id }),
+  startCopyProperties: (layerId) =>
+    set((state) => ({
+      copiedPropertiesFromId:
+        state.copiedPropertiesFromId === layerId ? null : layerId,
+    })),
+
+  cancelCopyProperties: () => set({ copiedPropertiesFromId: null }),
+
+  setSelectedLayer: (id) => {
+    const { copiedPropertiesFromId, layers } = get();
+    if (copiedPropertiesFromId && id && id !== copiedPropertiesFromId) {
+      const source = layers.find((l) => l.id === copiedPropertiesFromId);
+      const target = layers.find((l) => l.id === id);
+      if (source && target) {
+        get().pushHistory();
+        const sharedProps = {
+          x: source.x,
+          y: source.y,
+          width: source.width,
+          height: source.height,
+          rotation: source.rotation,
+          flipX: source.flipX,
+          flipY: source.flipY,
+          opacity: source.opacity,
+          lockAspectRatio: source.lockAspectRatio,
+        };
+        const updatedLayers = layers.map((l) => {
+          if (l.id !== id) return l;
+          if (source.type === 'image' && l.type === 'image') {
+            return {
+              ...l,
+              ...sharedProps,
+              adjustments: source.adjustments
+                ? {
+                    ...source.adjustments,
+                    colorEdits: source.adjustments.colorEdits.map((c) => ({
+                      ...c,
+                      id: generateId('cedit'),
+                    })),
+                    backgroundRemoval: source.adjustments.backgroundRemoval
+                      ? { ...source.adjustments.backgroundRemoval }
+                      : undefined,
+                  }
+                : createDefaultImageAdjustments(),
+            };
+          }
+          if (source.type === 'fog' && l.type === 'fog') {
+            return {
+              ...l,
+              ...sharedProps,
+              blurRadius: source.blurRadius,
+              colorIntensity: source.colorIntensity,
+              gradientType: source.gradientType,
+              angle: source.angle,
+              gradientSpread: source.gradientSpread,
+              radialCenterX: source.radialCenterX,
+              radialCenterY: source.radialCenterY,
+              radialInnerRadius: source.radialInnerRadius,
+              radialOuterRadius: source.radialOuterRadius,
+              fadeEdge: source.fadeEdge,
+              fadeEdges: source.fadeEdges ? [...source.fadeEdges] : undefined,
+              fadeOffset: source.fadeOffset,
+              fadeHeight: source.fadeHeight,
+              fadeColor: source.fadeColor,
+              fadeAlpha: source.fadeAlpha,
+              blurFollowsAlpha: source.blurFollowsAlpha,
+              borderRadius: source.borderRadius,
+              stops: source.stops.map((s) => ({
+                ...s,
+                id: generateId('stop'),
+              })),
+            };
+          }
+          return {
+            ...l,
+            ...sharedProps,
+          };
+        });
+        set({
+          layers: updatedLayers,
+          selectedLayerId: id,
+          copiedPropertiesFromId: null,
+        });
+        return;
+      }
+      set({ selectedLayerId: id, copiedPropertiesFromId: null });
+      return;
+    }
+    set({ selectedLayerId: id });
+  },
 
   setCanvasMode: (mode) =>
     set((state) => ({

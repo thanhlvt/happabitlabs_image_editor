@@ -12,6 +12,7 @@ import {
   Maximize,
   MoveHorizontal,
   MoveVertical,
+  Paintbrush,
   RotateCcw,
   RotateCw,
   Scaling,
@@ -96,12 +97,15 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
     canvas,
     layers,
     selectedLayerId,
+    copiedPropertiesFromId,
     openPropertySections,
     togglePropertySection,
     updateLayer,
     setCanvasBackground,
     enterCropMode,
     pushHistory,
+    startCopyProperties,
+    cancelCopyProperties,
   } = useEditorStore();
 
   const layer = layers.find((l) => l.id === selectedLayerId) ?? null;
@@ -190,16 +194,47 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
     }
   };
 
+  const isCopyingFromThis = copiedPropertiesFromId === layer.id;
+
   return (
     <div className="p-3.5 space-y-3.5 text-xs overflow-y-auto h-full">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-2">
         <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
           {layer.type === 'fog' ? 'Thuộc tính Sương mờ' : 'Thuộc tính Ảnh'}
         </span>
-        <span className="text-[11px] text-slate-500 truncate max-w-[130px]">
-          {layer.name}
-        </span>
+        <div className="flex items-center gap-1.5 min-w-0">
+          <button
+            type="button"
+            onClick={() => startCopyProperties(layer.id)}
+            title="Copy toàn bộ thuộc tính (kích thước, vị trí, màu sắc, alpha...) rồi chọn object khác để dán"
+            className={`flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium border transition-colors shrink-0 ${
+              isCopyingFromThis
+                ? 'bg-indigo-600 text-white border-indigo-400'
+                : 'bg-[#0f1115] text-slate-300 border-slate-700 hover:bg-slate-800 hover:text-white'
+            }`}
+          >
+            <Paintbrush className="w-3 h-3" />
+            <span>Copy properties</span>
+          </button>
+        </div>
       </div>
+
+      <div className="text-[11px] text-slate-500 truncate -mt-2">
+        {layer.name}
+      </div>
+
+      {copiedPropertiesFromId && (
+        <div className="flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg bg-indigo-500/15 border border-indigo-500/40 text-indigo-200 text-[11px]">
+          <span>Chọn object khác để dán thuộc tính (Esc để hủy)</span>
+          <button
+            type="button"
+            onClick={cancelCopyProperties}
+            className="text-indigo-300 hover:text-white underline shrink-0"
+          >
+            Hủy
+          </button>
+        </div>
+      )}
 
       {/* 1. Overall Object Alpha / Opacity */}
       <CollapsibleSection

@@ -180,7 +180,8 @@ export function App() {
       }
 
       if (e.key === 'Escape') {
-        if (state.activeTool === 'crop') cancelCropMode();
+        if (state.copiedPropertiesFromId) state.cancelCopyProperties();
+        else if (state.activeTool === 'crop') cancelCropMode();
         else if (state.activeTool === 'eyedropper') cancelEyedropper();
         else if (state.activeTool === 'magic-eraser') setActiveTool('select');
         else if (state.activeTool === 'marquee') setActiveTool('select');
